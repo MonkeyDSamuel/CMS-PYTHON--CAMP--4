@@ -1,0 +1,4 @@
+myvenv/
+db_config.ini
+__pycache__
+*.pyc
