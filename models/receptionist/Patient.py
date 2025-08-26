@@ -1,14 +1,26 @@
 from datetime import date
 import re
+
+
 class Patient:
-    'patient fields'
-    def __init__(self, patient_id = None, first_name = None, last_name = None, DOB = None,
-                 phone_no = None, email = None, address = None, height = None, weight = None,
-                 gender = None, blood_group = None, marital_status = None, current_medication = None,
-                 emergency_contact = None, is_active = "Y"):
-        self.__patient_id = patient_id
+    """Patient entity with validation and auto-generated ID"""
+
+    __id_counter = 0  # Class-level counter for auto ID generation
+
+    def __init__(self, patient_id=None, first_name=None, last_name=None, DOB=None,
+                 phone_no=None, email=None, address=None, height=None, weight=None,
+                 gender=None, blood_group=None, marital_status=None, current_medications=None,
+                 emergency_contact=None, is_active="Y"):
+
+        # Auto-generate patient_id if not provided
+        if patient_id is None:
+            Patient.__id_counter += 1
+            self.__patient_id = f"P{Patient.__id_counter:07d}"  # P0000001 format
+        else:
+            self.__patient_id = patient_id
+
         self.__first_name = first_name
-        self.__last_name = last_name 
+        self.__last_name = last_name
         self.__DOB = DOB
         self.__phone_no = phone_no
         self.__email = email
@@ -18,234 +30,233 @@ class Patient:
         self.__gender = gender
         self.__blood_group = blood_group
         self.__marital_status = marital_status
-        self.__current_medication = current_medication
+        self.__current_medications = current_medications
         self.__emergency_contact = emergency_contact
         self.__is_active = is_active
 
-#---------------------------
-#GETTERS AND SETTERS
-#---------------------------
+    # ---------------------------
+    # Getters & Setters
+    # ---------------------------
 
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Patient ID
     @property
     def patient_id(self):
         return self.__patient_id
 
     @patient_id.setter
-    def patient_id(self, patient_id):
-        self.__patient_id = patient_id
-        
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+    def patient_id(self, value):
+        if not value.startswith("P") or not value[1:].isdigit():
+            raise ValueError("Patient ID must be in format P0000001")
+        self.__patient_id = value
 
-
-    #First Name
+    # First Name
     @property
     def first_name(self):
         return self.__first_name
-    
+
     @first_name.setter
-    def set_first_name(self, name):
-        if not name or not isinstance(name, str):
-            raise ValueError("Name must be a non-empty string")
-        self.__first_name = name
+    def first_name(self, value):
+        if not value or not isinstance(value, str):
+            raise ValueError("First name must be a non-empty string")
+        self.__first_name = value.strip().title()
 
-
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Last Name
+    # Last Name
     @property
     def last_name(self):
         return self.__last_name
-    
-    @last_name.setter
-    def set_last_name(self, name):
-        if not name or not isinstance(name, str):
-            raise ValueError("Name must be a non-empty string")
-        self.__last_name = name
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #DOB
+    @last_name.setter
+    def last_name(self, value):
+        if not value or not isinstance(value, str):
+            raise ValueError("Last name must be a non-empty string")
+        self.__last_name = value.strip().title()
+
+    # DOB
     @property
     def DOB(self):
         return self.__DOB
 
     @DOB.setter
-    def DOB(self, DOB):
-        if DOB and not isinstance(DOB, date):
-            raise ValueError("DOB must be a date object")
-        self.__DOB = DOB
+    def DOB(self, value: date):
+        if value and not isinstance(value, date):
+            raise ValueError("DOB must be a datetime.date object")
+        if value:
+            today = date.today()
+            age = today.year - value.year - ((today.month, today.day) < (value.month, value.day))
+            if not (18 <= age <= 60):
+                raise ValueError("Patient age must be between 18 and 60")
+        self.__DOB = value
 
-        #Note: Validation must be done for 18<age<60
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Phone Number
+    # Phone Number
     @property
     def phone_no(self):
         return self.__phone_no
 
     @phone_no.setter
-    def phone_no(self, phone):
-        if phone and (not phone.isdigit() or len(phone) < 10):
-            raise ValueError("Phone must be numeric and at least 10 digits") # $$$$$Check this code again
-        self.__phone = phone
+    def phone_no(self, value: str):
+        if value:
+            if not (value.isdigit() and len(value) == 10 and value[0] in "987"):
+                raise ValueError("Phone number must be 10 digits starting with 9, 8, or 7")
+        self.__phone_no = value
 
-        #Note: Validation must be done as phone numbers should begin with 9, 8 or 7
-        # Also, the phone number must be exactly 10 digits, not atleast
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Email
+    # Email
     @property
     def email(self):
         return self.__email
 
     @email.setter
-    def email(self, email):
-        if email and "@" not in email:
-            raise ValueError("Invalid email format")
-        self.__email = email
+    def email(self, value: str):
+        if value:
+            pattern = r"^[\w\.-]+@[\w\.-]+\.(com|in|org|net)$"
+            if not re.match(pattern, value):
+                raise ValueError("Invalid email format")
+        self.__email = value
 
-        #Note: Proper email validation must be done (must end in .com/.in etc.,)
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-    #Address
+    # Address
     @property
     def address(self):
         return self.__address
 
     @address.setter
-    def address(self, address):
-        if address and not isinstance(address, str):
+    def address(self, value: str):
+        if value and not isinstance(value, str):
             raise ValueError("Address must be text")
-        self.__address = address
+        self.__address = value
 
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Height
+    # Height (cm)
     @property
     def height(self):
         return self.__height
 
     @height.setter
-    def height(self, height):
-        if height is not None and (height < 0 or height > 120):
-            raise ValueError("Height must be between 0 and 120")
-        self.__height = height
+    def height(self, value: int):
+        if value is not None and not (50 <= value <= 250):
+            raise ValueError("Height must be between 50 and 250 cm")
+        self.__height = value
 
-        #Note: Proper height digit(2-3) validation must be done
-        # Check if the >< symbols (height < 0 or height > 120) are in the right order
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Weight
+    # Weight (kg)
     @property
     def weight(self):
         return self.__weight
 
     @weight.setter
-    def weight(self, weight):
-        if weight is not None and (weight < 0 or weight > 120):
-            raise ValueError("Weight must be between 0 and 120")
-        self.__weight = weight
+    def weight(self, value: int):
+        if value is not None and not (2 <= value <= 300):
+            raise ValueError("Weight must be between 2 and 300 kg")
+        self.__weight = value
 
-        #Note: Proper weight digit(1-3) validation must be done
-        # Check if the >< symbols (weight < 0 or weight > 120) are in the right order
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Gender
+    # Gender
     @property
     def gender(self):
         return self.__gender
 
     @gender.setter
-    def gender(self, gender):
-        if gender not in (None, "Male", "Female", "Other"):
-            raise ValueError("Gender must be Male, Female or Other")
-        self.__gender = gender
+    def gender(self, value: str):
+        if value is None:
+            self.__gender = None
+            return
+        # Normalize input: accept 'M'/'F'/'O' and full words (case-insensitive)
+        normalized = value.strip()
+        if not normalized:
+            self.__gender = None
+            return
+        upper_val = normalized.upper()
+        if upper_val in ("M", "F", "O"):
+            mapping = {"M": "Male", "F": "Female", "O": "Other"}
+            self.__gender = mapping[upper_val]
+            return
+        title_val = normalized.title()
+        if title_val in ("Male", "Female", "Other"):
+            self.__gender = title_val
+            return
+        raise ValueError("Gender must be M, F, O or Male, Female, Other")
 
-        #Suggestion: User should have a choice between M, F and O; The data should be stored as Male, Female or Other
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-    #Blood Group
+    # Blood Group
     @property
     def blood_group(self):
-        return self._blood_group
+        return self.__blood_group
 
     @blood_group.setter
-    def blood_group(self, blood_group):
+    def blood_group(self, value: str):
         valid_groups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
-        if blood_group and blood_group not in valid_groups:
+        if value not in valid_groups:
             raise ValueError("Invalid blood group")
-        self._blood_group = blood_group
+        self.__blood_group = value
 
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Marital Status
+    # Marital Status
     @property
     def marital_status(self):
         return self.__marital_status
 
     @marital_status.setter
-    def marital_status(self, status):
-        if status not in (None, "Married", "Unmarried", "Other"):
-            raise ValueError("Marital Status must be Married, Unmarried or Other")
-        self.marital_status = status
+    def marital_status(self, value: str):
+        if value is None:
+            self.__marital_status = None
+            return
+        normalized = value.strip()
+        if not normalized:
+            self.__marital_status = None
+            return
+        upper_val = normalized.upper()
+        # Accept short codes M, UM, O
+        if upper_val in ("M", "UM", "O"):
+            mapping = {"M": "Married", "UM": "Unmarried", "O": "Other"}
+            self.__marital_status = mapping[upper_val]
+            return
+        title_val = normalized.title()
+        if title_val in ("Married", "Unmarried", "Other"):
+            self.__marital_status = title_val
+            return
+        raise ValueError("Marital Status must be M, Um, O or Married, Unmarried, Other")
 
-        #Note: Check if "Other" is required
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-    #Current Medication
+    # Current Medication
     @property
-    def current_medication(self):
-        return self.__current_medication
+    def current_medications(self):
+        return self.__current_medications
 
-    @current_medication.setter
-    def current_medication(self, medication):
-        if medication and not isinstance(medication, str):
-            raise ValueError("Current Medication must be text")
-        self.__current_medication = medication
+    @current_medications.setter
+    def current_medications(self, value: str):
+        if value and not isinstance(value, str):
+            raise ValueError("Current Medications must be text")
+        self.__current_medications = value
 
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-    #Emergency Phone Number
+    # Emergency Contact
     @property
     def emergency_contact(self):
         return self.__emergency_contact
 
     @emergency_contact.setter
-    def emergency_contact(self, phone):
-        if phone and (not phone.isdigit() or len(phone) < 10):
-            raise ValueError("Phone must be numeric and at least 10 digits") # $$$$$Check this code again
-        self.__emergency_contact = phone
+    def emergency_contact(self, value: str):
+        if value:
+            if not (value.isdigit() and len(value) == 10 and value[0] in "987"):
+                raise ValueError("Emergency contact must be 10 digits starting with 9, 8, or 7")
+        self.__emergency_contact = value
 
-        #Note: Validation must be done as phone numbers should begin with 9, 8 or 7
-        # Also, the phone number must be exactly 10 digits, not atleast
-#$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-
-    #Is Active
+    # Is Active
     @property
     def is_active(self):
         return self.__is_active
-    @is_active.setter
-    def is_active(self, is_active):
-        self.__is_active = is_active
 
-    #override__str__
+    @is_active.setter
+    def is_active(self, value: str):
+        if value not in ("Y", "N"):
+            raise ValueError("is_active must be 'Y' or 'N'")
+        self.__is_active = value
+
+    # String Representation
     def __str__(self):
         return f"""
         Patient ID: {self.__patient_id}
-        First Name: {self.__first_name}
-        Last Name: {self.__last_name}
-        Date of Birth: {self.__DOB}
-        Phone Number: {self.__phone_no}
-        Email: {self.__email}
-        Address: {self.__address}
-        Height: {self.__height}
-        Weight: {self.__weight}
-        Gender: {self.__gender}
-        Blood Group: {self.__blood_group}
-        Marital Status: {self.__marital_status}
-        Current Medication: {self.__current_medication}
-        Emergency Contact: {self.__emergency_contact}
-        IsActive: {self.__is_active}
+        Name      : {self.__first_name} {self.__last_name}
+        DOB       : {self.__DOB}
+        Phone     : {self.__phone_no}
+        Email     : {self.__email}
+        Address   : {self.__address}
+        Height    : {self.__height} cm
+        Weight    : {self.__weight} kg
+        Gender    : {self.__gender}
+        Blood Grp : {self.__blood_group}
+        Marital   : {self.__marital_status}
+        Medications: {self.__current_medications}
+        Emergency : {self.__emergency_contact}
+        Active    : {self.__is_active}
         """

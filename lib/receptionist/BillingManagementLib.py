@@ -1,92 +1,101 @@
 from dao.receptionist.BillingDAOImpl import BillingDaoImplementation
-from dao.receptionist.AbstractBillingDAO import BillingDaoService
 from models.receptionist.Billing import Billing
-from datetime import datetime
+from datetime import date
 
 class BillingManagementLib:
-    'handles CRUD logic'
-    dao_service:BillingDaoService = BillingDaoImplementation()
 
-    @staticmethod
-    def display_all():
-        billings = BillingManagementLib.dao_service.display_all_billings()
-        for billing in billings:
-            print(billing)
-    
-    @staticmethod
-    def add_billing():
-        billing = Billing()
-        appointment_id = input("Enter the appointment id: ")
-        billing.appointment_id(appointment_id)
-        categoryid = int(input("Enter the Category Id: "))
-        billing.set_category_id(categoryid)
-        # m_date = input("Enter manufacture Date(dd/mm/yyyy): ")
-        # util_date = datetime.strptime(m_date, "%d/%m/%Y")
-        # conv_m_date = util_date.date()
-        # billing.set_manufacture_date(conv_m_date)
-        # bill_date #$$$$$$$$$$$$$$$$$$$$$$
+    def __init__(self):
+        self.dao = BillingDaoImplementation()
 
-        if BillingManagementLib.dao_service.insert_billings(billing):
-            print("Inserted Successfully!!")
+    # =================================
+    # 1. Display all bills
+    # =================================
+    def display_all_bills(self):
+        bills = self.dao.display_all_bills()
+        if not bills:
+            print("No bills found.")
         else:
-            print("Something went wrong.....")
+            for bill in bills:
+                print(bill)
 
-#&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&        
-
-    @staticmethod
-    def update_billing():
-        searchId = int(input("Enter the billing ID: "))
-        #create a method in DAO
-        billing = BillingManagementLib.dao_service.find_by_billing_id(searchId)
-        if not billing:
-            print("Billing not found")
-            return
-        print(billing)
-        confirm = input("Do you want to edit this data? (y/n)")
-        if confirm.lower() == 'y':
-            billing.set_billing_name(input("Enter new billing Name: ") or billing.get_billingname())
-            billing.set_unitprice(float(input("Enter New Unit Price: ")) or billing.get_unitprice())
-
-            #pass the object to dao update
-            if BillingManagementLib.dao_service.update_billing(billing, searchId):
-                print("updated successfully ....")
+    # =================================
+    # 2. Insert new bill
+    # =================================
+    def insert_bill(self, appointment_id, total_bill):
+        try:
+            bill = Billing(
+                appointment_id=appointment_id,
+                total_bill=total_bill,
+                bill_date=date.today()
+            )
+            if self.dao.insert_bill(bill):
+                print("✅ Bill inserted successfully!")
+                # After insertion, bill.bill_id will already be set in DAO
+                print(bill)
             else:
-                print("something went wrong ....")
+                print("❌ Failed to insert bill.")
+        except Exception as e:
+            print("Error inserting bill:", e)
 
-    @staticmethod
-    def search_by_id():
-        searchId = int(input("Enter the billing ID: "))
-        #create a method in DAO
-        billing = BillingManagementLib.dao_service.find_by_billing_id(searchId)
-        if not billing:
-            print("Billing not found")
-            return
-        print(billing)
-    
-    @staticmethod
-    def disable_billing():
-        searchId = int(input("Enter the billing ID: "))
-        #create a method in DAO
-        billing = BillingManagementLib.dao_service.find_by_billing_id(searchId)
-        if not billing:
-            print("Billing not found")
-            return
-        print(billing)
-        billing.set_is_active("N")
-
-        #pass the object to dao update
-        if BillingManagementLib.dao_service.disable_billing(billing, searchId):
-            print("updated successfully ....")
+    # =================================
+    # 3. Find bill by ID
+    # =================================
+    def find_by_bill_id(self, bill_id):
+        bill = self.dao.find_by_bill_id(bill_id)
+        if bill:
+            print("✅ Bill found:")
+            print(bill)
+            return bill
         else:
-            print("something went wrong ....")
+            print(f"❌ No bill found with ID {bill_id}")
+            return None
 
-        # if BillingManagementLib.dao_service.disable_billing(billing, searchId):
+    # =================================
+    # 4. Update bill
+    # =================================
+    def update_bill(self, bill_id, appointment_id=None, total_bill=None):
+        bill = self.dao.find_by_bill_id(bill_id)
+        if not bill:
+            print(f"❌ Bill ID {bill_id} not found.")
+            return False
 
-    @staticmethod
-    def apply_gst_to_billing():
-        billing_id = int(input("Enter the billing ID to apply GST: "))
-        gst_percent = float(input("Enter GST percentage to apply: "))
-        if BillingManagementLib.dao_service.apply_gst(billing_id, gst_percent):
-            print(f"GST of {gst_percent} applied to billing ID (billing_id)")
+        if appointment_id:
+            bill.appointment_id = appointment_id
+        if total_bill:
+            bill.total_bill = total_bill
+
+        bill.bill_date = date.today()  # always refresh date on update
+
+        if self.dao.update_bill(bill, bill_id):
+            print("✅ Bill updated successfully!")
+            print(bill)
+            return True
         else:
-            print("failed to apply GST")
+            print("❌ Failed to update bill.")
+            return False
+
+    # =================================
+    # 5. Delete bill
+    # =================================
+    def delete_bill(self, bill_id):
+        if self.dao.delete_bill(bill_id):
+            print(f"✅ Bill {bill_id} deleted successfully.")
+            return True
+        else:
+            print(f"❌ Failed to delete bill {bill_id}.")
+            return False
+
+    # =================================
+    # 6. Create new bill (interactive)
+    # =================================
+    def create_bill(self):
+        try:
+            appointment_id = input("Enter Appointment ID: ").strip()
+            total_bill_str = input("Enter Total Bill (leave blank to auto): ").strip()
+            total_bill = int(total_bill_str) if total_bill_str else 0
+
+            self.insert_bill(appointment_id, total_bill)
+        except ValueError:
+            print("❌ Invalid amount entered for total bill.")
+        except Exception as e:
+            print("Error creating bill:", e)

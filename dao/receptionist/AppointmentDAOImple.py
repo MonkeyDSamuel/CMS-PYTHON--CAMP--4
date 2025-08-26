@@ -1,123 +1,172 @@
 from dao.receptionist.AbstractAppointmentDAO import AppointmentDaoService
 from db.db_connection import DBConnection
 from models.receptionist.Appointment import Appointment
-from typing import List
-# from pymysql.cursors import DictCursor
+from typing import List, Optional
+from pymysql.cursors import DictCursor
+
 
 class AppointmentDaoImplementation(AppointmentDaoService):
-    'Implementation for abstract class'
-    #SQL queries
-    DISPLAY_ALL = "SELECT * from appointments WHERE isActive = 'Y'"
-    INSERT_APPOINTMENT = "INSERT INTO appointments(patient_id, doctor_id, appointment_date, token_no, reason) VALUES (%s, %s, %s, %s, %s)" 
-    FIND_BY_ID = "SELECT * FROM appointments WHERE appointment_id = %s"
-    UPDATE_APPOINTMENT  = "UPDATE appointments set appointmentname = %s, unitprice = %s WHERE appointment_id = %s" #$$$$$$$$$$$$
-    DISABLE_APPOINTMENT = "UPDATE appointments set isActive = %s WHERE appointment_id = %s"
-    # APPLY_GST = "CALL apply_gst_to_appointment(%s, %s)"
+    """Implementation for Appointment DAO"""
+
+    DISPLAY_ALL = "SELECT * FROM appointment"
+    FIND_BY_APPOINTMENT_ID = "SELECT * FROM appointment WHERE Appointment_id = %s"
+    FIND_BY_PATIENT_ID = "SELECT * FROM appointment WHERE Patient_id = %s"
+    FIND_BY_DOCTOR_ID = "SELECT * FROM appointment WHERE Doctor_id = %s"
+    INSERT_APPOINTMENT = (
+        "INSERT INTO appointment (Appointment_id, Patient_id, Doctor_id, Appointment_date, reason, token_no) "
+        "VALUES (%s, %s, %s, %s, %s, %s)"
+    )
+    UPDATE_APPOINTMENT = (
+        "UPDATE appointment SET Patient_id = %s, Doctor_id = %s, Appointment_date = %s, reason = %s, token_no = %s "
+        "WHERE Appointment_id = %s"
+    )
+    DELETE_APPOINTMENT = "DELETE FROM appointment WHERE Appointment_id = %s"
 
     def __init__(self):
         self.conn = DBConnection().get_connection()
 
-    def insert_appointments(self, appointment:Appointment) -> bool:
-        try:
-            cursor = self.conn.cursor() #create a cursor object
-            cursor.execute(self.INSERT_APPOINTMENT,
-                           (appointment.patient_id(),
-                           appointment.doctor_id(),
-                           appointment.appointment_date(),
-                           appointment.token_no(),
-                           appointment.reason()))
-            self.conn.commit()
-            return cursor.rowcount == 1
-        except Exception as e:
-            print("Error inserting appointment: ", e)
-            return False
-        finally:
-            cursor.close()
-
     def display_all_appointments(self) -> List[Appointment]:
-        appointments = [] #to store the records from db
+        appointments = []
         try:
-            cursor = self.conn.cursor() #(DictCursor) #returns data in dictionary format $$$$$$$$$
-            cursor.execute(self.DISPLAY_ALL) #fire the query
+            cursor = self.conn.cursor(DictCursor)
+            cursor.execute(self.DISPLAY_ALL)
             rows = cursor.fetchall()
             for row in rows:
                 appointments.append(Appointment(
-                            appointment_id = row["appointment_id"],
-                            patient_id = row["patient_id"],
-                            doctor_id = row["doctor_id"],
-                            appointment_date = row["appointment_date"],
-                            token_no = row["token_no"],
-                            reason = row["reason"]
-                            ))
+                    appointment_id=row["Appointment_id"],
+                    patient_id=row["Patient_id"],
+                    doctor_id=row["Doctor_id"],
+                    appointment_date=row["Appointment_date"],
+                    reason=row["reason"],
+                    token_no=row["token_no"]
+                ))
         except Exception as e:
-            print("Error fetching appointments: ", e)
+            print("Error fetching appointments:", e)
         finally:
             cursor.close()
         return appointments
-        
-    def find_by_appointment_id(self, appointment_id:int):
+
+    def find_by_appointment_id(self, appointment_id: str) -> Optional[Appointment]:
         appointment = None
         try:
-            cursor = self.conn.cursor() #(DictCursor) $$$$$$$$$$$$$
-            cursor.execute(self.FIND_BY_ID, (appointment_id,))
+            cursor = self.conn.cursor(DictCursor)
+            cursor.execute(self.FIND_BY_APPOINTMENT_ID, (appointment_id,))
             row = cursor.fetchone()
             if row:
                 appointment = Appointment(
-                            appointment_id = row["appointment_id"],
-                            patient_id = row["patient_id"],
-                            doctor_id = row["doctor_id"],
-                            appointment_date = row["appointment_date"],
-                            token_no = row["token_no"],
-                            reason = row["reason"]
-                            )
+                    appointment_id=row["Appointment_id"],
+                    patient_id=row["Patient_id"],
+                    doctor_id=row["Doctor_id"],
+                    appointment_date=row["Appointment_date"],
+                    reason=row["reason"],
+                    token_no=row["token_no"]
+                )
         except Exception as e:
-            print("Error finding appointment: ", e)
+            print("Error finding appointment by ID:", e)
         finally:
             cursor.close()
         return appointment
 
-    def update_appointment(self, appointment:Appointment, appointment_id:int) ->bool:
+    def find_by_patient_id(self, patient_id: str) -> List[Appointment]:
+        appointments = []
         try:
-            cursor = self.conn.cursor() #(DictCursor) $$$$$$$$$$
-            cursor.execute(self.UPDATE_APPOINTMENT,
-                           (appointment.patient_id(),
-                           appointment.doctor_id(),
-                           appointment.appointment_date(),
-                           appointment.token_no(),
-                           appointment.reason()))
-            self.conn.commit()
-            return cursor.rowcount == 1
+            cursor = self.conn.cursor(DictCursor)
+            cursor.execute(self.FIND_BY_PATIENT_ID, (patient_id,))
+            rows = cursor.fetchall()
+            for row in rows:
+                appointments.append(Appointment(
+                    appointment_id=row["Appointment_id"],
+                    patient_id=row["Patient_id"],
+                    doctor_id=row["Doctor_id"],
+                    appointment_date=row["Appointment_date"],
+                    reason=row["reason"],
+                    token_no=row["token_no"]
+                ))
         except Exception as e:
-            print("Error updating appointment: ", e)
-            return False
+            print("Error finding appointments by patient ID:", e)
         finally:
             cursor.close()
+        return appointments
 
-    # def disable_appointment(self, appointment:Appointment, appointment_id:int) ->bool:
-    #     try:
-    #         cursor = self.conn.cursor() #(DictCursor) $$$$$$$$$$$$$$$$$$$$
-    #         cursor.execute(self.DISABLE_APPOINTMENT,
-    #                        (appointment.get_is_active(),
-    #                         appointment_id))
-    #         self.conn.commit()
-    #         return cursor.rowcount == 1
-    #     except Exception as e:
-    #         print("Error updating appointment: ", e)
-    #         return False
-    #     finally:
-    #         cursor.close()
+    def find_by_doctor_id(self, doctor_id: str) -> List[Appointment]:
+        appointments = []
+        try:
+            cursor = self.conn.cursor(DictCursor)
+            cursor.execute(self.FIND_BY_DOCTOR_ID, (doctor_id,))
+            rows = cursor.fetchall()
+            for row in rows:
+                appointments.append(Appointment(
+                    appointment_id=row["Appointment_id"],
+                    patient_id=row["Patient_id"],
+                    doctor_id=row["Doctor_id"],
+                    appointment_date=row["Appointment_date"],
+                    reason=row["reason"],
+                    token_no=row["token_no"]
+                ))
+        except Exception as e:
+            print("Error finding appointments by doctor ID:", e)
+        finally:
+            cursor.close()
+        return appointments
 
-    # def apply_gst(self, appointment_id:int, gst_percent:float) ->bool:
-    #     cursor = None
-    #     try:
-    #         cursor = self.conn.cursor()
-    #         cursor.execute(self.APPLY_GST, (appointment_id, gst_percent))
-    #         self.conn.commit()
-    #         return cursor.rowcount >=0 #since sp returns 0 if already applied
-    #     except Exception as e:
-    #         print("Error applying GST: ", e)
-    #         return False
-    #     finally:
-    #         if cursor:
-    #             cursor.close()
-                
+    def insert_appointment(self, appointment: Appointment) -> bool:
+        try:
+            cursor = self.conn.cursor()
+            values = (
+                appointment.appointment_id,
+                appointment.patient_id,
+                appointment.doctor_id,
+                appointment.appointment_date,
+                appointment.reason,
+                appointment.token_no,
+            )
+            cursor.execute(self.INSERT_APPOINTMENT, values)
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print("Error inserting appointment:", e)
+            return False
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
+    def update_appointment(self, appointment: Appointment, appointment_id: str) -> bool:
+        try:
+            cursor = self.conn.cursor()
+            values = (
+                appointment.patient_id,
+                appointment.doctor_id,
+                appointment.appointment_date,
+                appointment.reason,
+                appointment.token_no,
+                appointment_id,
+            )
+            cursor.execute(self.UPDATE_APPOINTMENT, values)
+            self.conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print("Error updating appointment:", e)
+            return False
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
+    def cancel_appointment(self, appointment_id: str) -> bool:
+        # If a status column exists, consider updating it instead of deleting.
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(self.DELETE_APPOINTMENT, (appointment_id,))
+            self.conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print("Error cancelling appointment:", e)
+            return False
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass

@@ -1,30 +1,48 @@
-#Data Abstract Object
+# Data Abstract Object
 from abc import ABC, abstractmethod
 from typing import List
 from models.receptionist.Billing import Billing
 
 class BillingDaoService(ABC):
+
     @abstractmethod
-    def display_all_billings(self) -> List[Billing]:
-        '''fetch all billings'''
+    def display_all_bills(self) -> List[Billing]:
+        """Fetch all bills from DB"""
         pass
 
     @abstractmethod
-    def insert_billings(self) ->bool:
-        '''insert a billing to db'''
+    def insert_bill(self, billing: Billing) -> bool:
+        """Insert a new bill record into DB"""
         pass
 
     @abstractmethod
-    def find_by_billing_id(self, billing_id:int) -> Billing:
-        '''find a billing by ID'''
-        pass
-    
-    @abstractmethod
-    def update_billing(self, billing:Billing, billing_id:int) -> bool:
-        '''update a billing by its ID'''
+    def find_by_bill_id(self, bill_id: str) -> Billing:
+        """Find a bill by Bill ID"""
         pass
 
-    # @abstractmethod
-    # def apply_gst(self, billing_id:int, gst_percent:float) -> bool:
-    #     '''compute the gst of the billing'''
-    #     pass
+    @abstractmethod
+    def update_bill(self, billing: Billing, bill_id: str) -> bool:
+        """Update bill details by Bill ID"""
+        pass
+
+    @abstractmethod
+    def delete_bill(self, bill_id: str) -> bool:
+        """Delete a bill record by Bill ID"""
+        pass
+
+    # =========================
+    # New Abstract Methods
+    # =========================
+
+    @abstractmethod
+    def generate_bill_id(self) -> str:
+        """Generate the next Bill ID in the format B00001, B00002..."""
+        pass
+
+    @abstractmethod
+    def fetch_doctor_fee_by_appointment(self, appointment_id: str) -> int:
+        """
+        Get the consultation fee of the doctor 
+        for the given appointment_id.
+        """
+        pass

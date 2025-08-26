@@ -1,161 +1,227 @@
 from dao.receptionist.AbstractPatientDAO import PatientDaoService
 from db.db_connection import DBConnection
 from models.receptionist.Patient import Patient
-from typing import List
-# from pymysql.cursors import DictCursor #Check this once
+from typing import List, Optional
+from pymysql.cursors import DictCursor
 
 class PatientDaoImplementation(PatientDaoService):
-    'Implementation for abstract class'
-    #SQL queries
-    DISPLAY_ALL = "SELECT * from patients WHERE isActive = 'Y'"
-    INSERT_PATIENT = "INSERT INTO patients(first_name, last_name, DOB, phone_no," \
-                    "email, address, height, weight" \
-                    "gender, blood_group, marital_status, current_medication," \
-                    "emergency_contact, is_active" \
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" 
-    FIND_BY_ID = "SELECT * FROM patients WHERE patient_id = %s"
-    UPDATE_PATIENT  = "UPDATE patients set patient_name = %s, unitprice = %s WHERE patient_id = %s" #$$$$$$$$$$$$
-    DISABLE_PATIENT = "UPDATE patients set isActive = %s WHERE patient_id = %s"
-    # APPLY_GST = "CALL apply_gst_to_patient(%s, %s)"
+    """Implementation for abstract class"""
+
+    # SQL Queries
+    DISPLAY_ALL = "SELECT * FROM patient WHERE is_active = 1"
+    
+    GET_LAST_ID = "SELECT patient_id FROM patient ORDER BY patient_id DESC LIMIT 1"
+    
+    INSERT_PATIENT = """
+        INSERT INTO patient (
+            patient_id, first_name, last_name, DOB, phone_no, email_id, address,
+            height, weight, gender, blood_group, marital_status,
+            current_medications, emergency_contact, is_active
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    
+    FIND_BY_ID = "SELECT * FROM patient WHERE patient_id = %s"
+    
+    UPDATE_PATIENT = """
+        UPDATE patient 
+        SET first_name = %s, last_name = %s, DOB = %s, phone_no = %s,
+            email_id = %s, address = %s, height = %s, weight = %s,
+            gender = %s, blood_group = %s, marital_status = %s,
+            current_medications = %s, emergency_contact = %s, is_active = %s
+        WHERE patient_id = %s
+    """
+    
+    DISABLE_PATIENT = "UPDATE patient SET is_active = %s WHERE patient_id = %s"
     
     def __init__(self):
         self.conn = DBConnection().get_connection()
 
-    def insert_patients(self, patient:Patient) -> bool:
+    def _to_gender_code(self, gender_value: str) -> str:
+        """Normalize gender to single-letter code expected by DB (M/F/O)."""
+        if not gender_value:
+            return None
+        upper_val = gender_value.upper()
+        if upper_val in ("M", "F", "O"):
+            return upper_val
+        mapping = {"MALE": "M", "FEMALE": "F", "OTHER": "O"}
+        return mapping.get(upper_val, upper_val)
+
+    def _to_active_tinyint(self, active_value: str) -> int:
+        """Map model's 'Y'/'N' to DB tinyint 1/0."""
+        if active_value is None:
+            return None
+        return 1 if str(active_value).upper() == 'Y' else 0
+
+    def _generate_patient_id(self) -> str:
+        """Generate next patient_id in format P0000001, P0000002..."""
+        cursor = self.conn.cursor()
+        cursor.execute(self.GET_LAST_ID)
+        last_id_row = cursor.fetchone()
+        cursor.close()
+
+        if last_id_row and last_id_row[0]:
+            last_id = last_id_row[0]   # e.g., "P0000005"
+            last_num = int(last_id[1:])  # remove 'P' and convert to int
+            new_num = last_num + 1
+        else:
+            new_num = 1  # first patient
+
+        return f"P{new_num:07d}"  # always 7 digits (P0000001)
+
+    def insert_patient(self, patient: Patient) -> bool:
+        cursor = None
         try:
-            cursor = self.conn.cursor() #create a cursor object
-            cursor.execute(self.INSERT_PATIENT,
-                           (patient.first_name(),
-                           patient.last_name(),
-                           patient.DOB(),
-                           patient.phone_no(),
-                           patient.email(),
-                           patient.address(),
-                           patient.height(),
-                           patient.weight(),
-                           patient.gender(),
-                           patient.blood_group(),
-                           patient.marital_status(),
-                           patient.current_medication(),
-                           patient.emergency_contact(),
-                           patient.is_active()))
+            new_patient_id = self._generate_patient_id()
+            cursor = self.conn.cursor()
+            cursor.execute(self.INSERT_PATIENT, (
+                new_patient_id,
+                patient.first_name,
+                patient.last_name,
+                patient.DOB,
+                patient.phone_no,
+                patient.email,
+                patient.address,
+                patient.height,
+                patient.weight,
+                self._to_gender_code(patient.gender),
+                patient.blood_group,
+                patient.marital_status,
+                patient.current_medications,
+                patient.emergency_contact,
+                self._to_active_tinyint(patient.is_active)
+            ))
             self.conn.commit()
             return cursor.rowcount == 1
         except Exception as e:
             print("Error inserting patient: ", e)
             return False
         finally:
-            cursor.close()
+            try:
+                if cursor is not None:
+                    cursor.close()
+            except Exception:
+                pass
 
     def display_all_patients(self) -> List[Patient]:
-        patients = [] #to store the records from db
+        patients = []
+        cursor = None
         try:
-            cursor = self.conn.cursor() #(DictCursor) #returns data in dictionary format $$$$$$$$$$
-            cursor.execute(self.DISPLAY_ALL) #fire the query
+            cursor = self.conn.cursor(DictCursor)
+            cursor.execute(self.DISPLAY_ALL)
             rows = cursor.fetchall()
             for row in rows:
-                patients.append(Patient(patient_id = row["patient_id"],
-                                        first_name = row["first_name"],
-                                        last_name = row["last_name"],
-                                        DOB = row["DOB"],
-                                        phone_no = row["phone_no"],
-                                        email = row["email"],
-                                        address = row["address"],
-                                        height = row["height"],
-                                        weight = row["weight"],
-                                        gender = row["gender"],
-                                        blood_group = row["blood_group"],
-                                        marital_status = row["marital_status"],
-                                        current_medication = row["current_medication"],
-                                        last_name = row["emergency_contact"],
-                                        is_active = row["isActive"]))
+                patients.append(Patient(
+                    patient_id=row["patient_id"],
+                    first_name=row["first_name"],
+                    last_name=row["last_name"],
+                    DOB=row["DOB"],
+                    phone_no=row["phone_no"],
+                    email=row["email_id"],
+                    address=row["address"],
+                    height=row["height"],
+                    weight=row["weight"],
+                    gender=row["gender"],
+                    blood_group=row["blood_group"],
+                    marital_status=row["marital_status"],
+                    current_medications=row["current_medications"],
+                    emergency_contact=row["emergency_contact"],
+                    is_active=('Y' if row["is_active"] == 1 else 'N')
+                ))
         except Exception as e:
             print("Error fetching patients: ", e)
         finally:
-            cursor.close()
+            try:
+                if cursor is not None:
+                    cursor.close()
+            except Exception:
+                pass
         return patients
-    
-    def find_by_patient_id(self, patient_id:int):
+
+    def find_by_patient_id(self, patient_id: str) -> Optional[Patient]:
         patient = None
+        cursor = None
         try:
-            cursor = self.conn.cursor() #(DictCursor) $$$$$$$$$$$$$
+            cursor = self.conn.cursor(DictCursor)
             cursor.execute(self.FIND_BY_ID, (patient_id,))
             row = cursor.fetchone()
             if row:
                 patient = Patient(
-                    patient_id = row["patient_id"],
-                    first_name = row["first_name"],
-                    last_name = row["last_name"],
-                    DOB = row["DOB"],
-                    phone_no = row["phone_no"],
-                    email = row["email"],
-                    address = row["address"],
-                    height = row["height"],
-                    weight = row["weight"],
-                    gender = row["gender"],
-                    blood_group = row["blood_group"],
-                    marital_status = row["marital_status"],
-                    current_medication = row["current_medication"],
-                    last_name = row["emergency_contact"],
-                    is_active = row["isActive"]
-                    )
+                    patient_id=row["patient_id"],
+                    first_name=row["first_name"],
+                    last_name=row["last_name"],
+                    DOB=row["DOB"],
+                    phone_no=row["phone_no"],
+                    email=row["email_id"],
+                    address=row["address"],
+                    height=row["height"],
+                    weight=row["weight"],
+                    gender=row["gender"],
+                    blood_group=row["blood_group"],
+                    marital_status=row["marital_status"],
+                    current_medications=row["current_medications"],
+                    emergency_contact=row["emergency_contact"],
+                    is_active=('Y' if row["is_active"] == 1 else 'N')
+                )
         except Exception as e:
             print("Error finding patient: ", e)
         finally:
-            cursor.close()
+            try:
+                if cursor is not None:
+                    cursor.close()
+            except Exception:
+                pass
         return patient
 
-    def update_patient(self, patient:Patient, patient_id:int) ->bool:
+    def update_patient(self, patient: Patient, patient_id: str) -> bool:
+        cursor = None
         try:
-            cursor = self.conn.cursor() #(DictCursor) $$$$$$$$$$$$$$$
-            cursor.execute(self.UPDATE_PATIENT,
-                           (patient.first_name(),
-                           patient.last_name(),
-                           patient.DOB(),
-                           patient.phone_no(),
-                           patient.email(),
-                           patient.address(),
-                           patient.height(),
-                           patient.weight(),
-                           patient.gender(),
-                           patient.blood_group(),
-                           patient.marital_status(),
-                           patient.current_medication(),
-                           patient.emergency_contact(),
-                           patient.is_active()))
+            cursor = self.conn.cursor()
+            cursor.execute(self.UPDATE_PATIENT, (
+                patient.first_name,
+                patient.last_name,
+                patient.DOB,
+                patient.phone_no,
+                patient.email,
+                patient.address,
+                patient.height,
+                patient.weight,
+                self._to_gender_code(patient.gender),
+                patient.blood_group,
+                patient.marital_status,
+                patient.current_medications,
+                patient.emergency_contact,
+                self._to_active_tinyint(patient.is_active),
+                patient_id
+            ))
             self.conn.commit()
             return cursor.rowcount == 1
         except Exception as e:
             print("Error updating patient: ", e)
             return False
         finally:
-            cursor.close()
+            try:
+                if cursor is not None:
+                    cursor.close()
+            except Exception:
+                pass
 
-    def disable_patient(self, patient:Patient, patient_id:int) ->bool:
+    def disable_patient(self, patient: Patient, patient_id: str) -> bool:
+        cursor = None
         try:
-            cursor = self.conn.cursor() #(DictCursor) $$$$$$$$$$$$$$$
-            cursor.execute(self.DISABLE_PATIENT,
-                           (patient.is_active(),
-                            patient_id))
+            cursor = self.conn.cursor()
+            cursor.execute(self.DISABLE_PATIENT, (
+                self._to_active_tinyint(patient.is_active),
+                patient_id
+            ))
             self.conn.commit()
             return cursor.rowcount == 1
         except Exception as e:
-            print("Error updating patient: ", e)
+            print("Error disabling patient: ", e)
             return False
         finally:
-            cursor.close()
-
-    # def apply_gst(self, patient_id:int, gst_percent:float) ->bool:
-    #     cursor = None
-    #     try:
-    #         cursor = self.conn.cursor()
-    #         cursor.execute(self.APPLY_GST, (patient_id, gst_percent))
-    #         self.conn.commit()
-    #         return cursor.rowcount >=0 #since sp returns 0 if already applied
-    #     except Exception as e:
-    #         print("Error applying GST: ", e)
-    #         return False
-    #     finally:
-    #         if cursor:
-    #             cursor.close()
-                
+            try:
+                if cursor is not None:
+                    cursor.close()
+            except Exception:
+                pass

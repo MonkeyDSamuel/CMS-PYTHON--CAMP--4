@@ -1,116 +1,151 @@
-from dao.receptionist.AbstractBillingDAO import BillingDaoService
 from db.db_connection import DBConnection
+from dao.receptionist.AbstractBillingDAO import BillingDaoService
 from models.receptionist.Billing import Billing
-from typing import List
-# from pymysql.cursors import DictCursor
+from datetime import date
+
 
 class BillingDaoImplementation(BillingDaoService):
-    'Implementation for abstract class'
-    #SQL queries
-    DISPLAY_ALL = "SELECT * from billings WHERE isActive = 'Y'"
-    INSERT_BILLING = "INSERT INTO billings(appointment_id, total_bill, bill_date) VALUES (%s, %s, %s)" 
-    FIND_BY_ID = "SELECT * FROM billings WHERE billingid = %s"
-    UPDATE_BILLING  = "UPDATE billings set billingname = %s, unitprice = %s WHERE billingid = %s" #$$$$$$$$$$$$
-    DISABLE_BILLING = "UPDATE billings set isActive = %s WHERE billingid = %s" #$$$$$$$$$$$$
-    # APPLY_GST = "CALL apply_gst_to_billing(%s, %s)"
 
-    def __init__(self):
-        self.conn = DBConnection().get_connection()
+    # =============================
+    # SQL Queries
+    # =============================
+    QUERY_DISPLAY_ALL = """
+        SELECT bill_id, appointment_id, total_bill, bill_date 
+        FROM billing
+    """
+    QUERY_INSERT = """
+        INSERT INTO billing (bill_id, appointment_id, total_bill, bill_date) 
+        VALUES (%s, %s, %s, %s)
+    """
+    QUERY_FIND_BY_ID = """
+        SELECT bill_id, appointment_id, total_bill, bill_date 
+        FROM billing WHERE bill_id = %s
+    """
+    QUERY_UPDATE = """
+        UPDATE billing 
+        SET appointment_id = %s, total_bill = %s, bill_date = %s 
+        WHERE bill_id = %s
+    """
+    QUERY_DELETE = """
+        DELETE FROM billing WHERE bill_id = %s
+    """
+    QUERY_GET_LAST_ID = """
+        SELECT bill_id FROM billing ORDER BY bill_id DESC LIMIT 1
+    """
+    QUERY_DOCTOR_FEE_BY_APPT = """
+        SELECT d.consultation_fee
+        FROM appointment a
+        JOIN doctor d ON a.doctor_id = d.doctor_id
+        WHERE a.appointment_id = %s
+    """
 
-    def insert_billings(self, billing:Billing) -> bool:
+    # =============================
+    # Constructor (DB connection)
+    # =============================
+    def __init__(self, host="localhost", user="root", password="", database="clinic_db"):
         try:
-            cursor = self.conn.cursor() #create a cursor object
-            cursor.execute(self.INSERT_BILLING,
-                           (billing.appointment_id(),
-                           billing.total_bill(),
-                           billing.bill_date(),
-                           ))
+            # Reuse the shared DB connection configured via db_config.ini
+            self.conn = DBConnection().get_connection()
+            self.cursor = self.conn.cursor()
+        except Exception as err:
+            print("Database connection error:", err)
+            raise
+
+    # =============================
+    # Helper: Generate next Bill ID
+    # =============================
+    def generate_bill_id(self) -> str:
+        self.cursor.execute(self.QUERY_GET_LAST_ID)
+        last_id = self.cursor.fetchone()
+
+        if last_id is None:
+            return "B00001"
+        else:
+            last_num = int(last_id[0][1:])  # strip 'B' and convert
+            new_num = last_num + 1
+            return f"B{new_num:05d}"
+
+    # =============================
+    # Helper: Fetch Doctor Fee
+    # =============================
+    def fetch_doctor_fee_by_appointment(self, appointment_id: str) -> int:
+        self.cursor.execute(self.QUERY_DOCTOR_FEE_BY_APPT, (appointment_id,))
+        row = self.cursor.fetchone()
+        return row[0] if row else 0
+
+    # =============================
+    # Display all bills
+    # =============================
+    def display_all_bills(self):
+        self.cursor.execute(self.QUERY_DISPLAY_ALL)
+        rows = self.cursor.fetchall()
+        return [
+            Billing(
+                bill_id=row[0],
+                appointment_id=row[1],
+                total_bill=row[2],
+                bill_date=row[3]
+            )
+            for row in rows
+        ]
+
+    # =============================
+    # Insert bill
+    # =============================
+    def insert_bill(self, billing: Billing) -> bool:
+        try:
+            # Auto-generate Bill ID + set bill date
+            billing.bill_id = self.generate_bill_id()
+            billing.bill_date = date.today()
+
+            # Optionally: auto-fetch doctor’s fee if not set
+            if billing.total_bill is None or billing.total_bill == 0:
+                billing.total_bill = self.fetch_doctor_fee_by_appointment(billing.appointment_id)
+
+            values = (billing.bill_id, billing.appointment_id, billing.total_bill, billing.bill_date)
+            self.cursor.execute(self.QUERY_INSERT, values)
             self.conn.commit()
-            return cursor.rowcount == 1
+            return True
         except Exception as e:
-            print("Error inserting billing: ", e)
+            print("Error inserting bill:", e)
             return False
-        finally:
-            cursor.close()
 
-    def display_all_billings(self) -> List[Billing]:
-        billings = [] #to store the records from db
-        try:
-            cursor = self.conn.cursor() #(DictCursor) #returns data in dictionary format
-            cursor.execute(self.DISPLAY_ALL) #fire the query
-            rows = cursor.fetchall()
-            for row in rows:
-                billings.append(Billing(billing_id = row["billing_id"],
-                                        appointment_id = row["appointment_id"],
-                                        unitprice = row["unitprice"],
-                                        categoryid = row["categoryid"],
-                                        manufacturedate = row["manufacturedate"],
-                                        is_active = row["isActive"]))
-        except Exception as e:
-            print("Error fetching billings: ", e)
-        finally:
-            cursor.close()
-        return billings
-    
-    def find_by_billing_id(self, billing_id:int):
-        billing = None
-        try:
-            cursor = self.conn.cursor() #(DictCursor) #$$$$$$$$$$$$
-            cursor.execute(self.FIND_BY_ID, (billing_id,))
-            row = cursor.fetchone()
-            if row:
-                billing = Billing(
-                    billingid = row["billingid"],
-                    appointment_id = row["appointment_id"],
-                    total_bill = row["total_bill"],
-                    bill_date = row["bill_date"],
-                    )
-        except Exception as e:
-            print("Error finding billing: ", e)
-        finally:
-            cursor.close()
-        return billing
+    # =============================
+    # Find bill by ID
+    # =============================
+    def find_by_bill_id(self, bill_id: str):
+        self.cursor.execute(self.QUERY_FIND_BY_ID, (bill_id,))
+        row = self.cursor.fetchone()
+        if row:
+            return Billing(
+                bill_id=row[0],
+                appointment_id=row[1],
+                total_bill=row[2],
+                bill_date=row[3]
+            )
+        return None
 
-    def update_billing(self, billing:Billing, billing_id:int) ->bool:
+    # =============================
+    # Update bill
+    # =============================
+    def update_bill(self, billing: Billing, bill_id: str) -> bool:
         try:
-            cursor = self.conn.cursor() #(DictCursor) #$$$$$$$$$$$$
-            cursor.execute(self.UPDATE_BILLING,
-                           (billing.appointment_id(),
-                            billing.total_bill(),
-                            ))
+            values = (billing.appointment_id, billing.total_bill, billing.bill_date, bill_id)
+            self.cursor.execute(self.QUERY_UPDATE, values)
             self.conn.commit()
-            return cursor.rowcount == 1
+            return self.cursor.rowcount > 0
         except Exception as e:
-            print("Error updating billing: ", e)
+            print("Error updating bill:", e)
             return False
-        finally:
-            cursor.close()
 
-    # def disable_billing(self, billing:Billing, billing_id:int) ->bool:
-    #     try:
-    #         cursor = self.conn.cursor() #(DictCursor) #$$$$$$$$$$$$
-    #         cursor.execute(self.DISABLE_BILLING,
-    #                        (billing.get_is_active(),
-    #                         billing_id))
-    #         self.conn.commit()
-    #         return cursor.rowcount == 1
-    #     except Exception as e:
-    #         print("Error updating billing: ", e)
-    #         return False
-    #     finally:
-    #         cursor.close()
-
-    # def apply_gst(self, billing_id:int, gst_percent:float) ->bool:
-    #     cursor = None
-    #     try:
-    #         cursor = self.conn.cursor()
-    #         cursor.execute(self.APPLY_GST, (billing_id, gst_percent))
-    #         self.conn.commit()
-    #         return cursor.rowcount >=0 #since sp returns 0 if already applied
-    #     except Exception as e:
-    #         print("Error applying GST: ", e)
-    #         return False
-    #     finally:
-    #         if cursor:
-    #             cursor.close()
-                
+    # =============================
+    # Delete bill
+    # =============================
+    def delete_bill(self, bill_id: str) -> bool:
+        try:
+            self.cursor.execute(self.QUERY_DELETE, (bill_id,))
+            self.conn.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            print("Error deleting bill:", e)
+            return False

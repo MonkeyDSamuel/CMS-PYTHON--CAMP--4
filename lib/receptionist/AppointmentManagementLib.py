@@ -1,95 +1,80 @@
 from dao.receptionist.AppointmentDAOImple import AppointmentDaoImplementation
-from dao.receptionist.AbstractAppointmentDAO import AppointmentDaoService
 from models.receptionist.Appointment import Appointment
-from datetime import datetime
+
 
 class AppointmentManagementLib:
-    'handles CRUD logic'
-    dao_service:AppointmentDaoService = AppointmentDaoImplementation()
+    """Library layer for managing appointments"""
 
-    @staticmethod
-    def display_all():
-        appointments = AppointmentManagementLib.dao_service.display_all_appointments()
-        for appointment in appointments:
-            print(appointment)
-    
-    @staticmethod
-    def add_appointment():
-        appointment = Appointment()
-        patient_id = input("Enter the appointment Name: ")
-        appointment.patient_id(patient_id)
-        doctor_id = input("Enter the appointment Name: ")
-        appointment.doctor_id(doctor_id)
-        appointment_date = input("Enter manufacture Date(dd/mm/yyyy): ") #or current date.today
-        util_date = datetime.strptime(appointment_date, "%d/%m/%Y")
-        conv_m_date = util_date.date()
-        appointment.appointment_date(conv_m_date)
-        reason = input("Enter the appointment Name: ")
-        appointment.reason(reason)
+    def __init__(self):
+        self.appointment_dao = AppointmentDaoImplementation()
 
-        if AppointmentManagementLib.dao_service.insert_appointments(appointment):
-            print("Inserted Successfully!!")
-        else:
-            print("Something went wrong.....")
-        
-#token is auto generated
-#&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&        
+    def generate_appointment_id(self) -> str:
+        """
+        Generate a new appointment ID in format A00001.
+        Adjust this logic if you already have a centralized ID generator.
+        """
+        appointments = self.appointment_dao.display_all_appointments()
+        if not appointments:
+            return "A00001"
 
+        last_id = sorted(appointments, key=lambda x: x.appointment_id)[-1].appointment_id
+        num = int(last_id[1:]) + 1
+        return f"A{num:05d}"
 
-    @staticmethod
-    def update_appointment():
-        searchId = int(input("Enter the appointment ID: "))
-        #create a method in DAO
-        appointment = AppointmentManagementLib.dao_service.find_by_appointment_id(searchId)
-        if not appointment:
-            print("Appointment not found")
-            return
-        print(appointment)
-        confirm = input("Do you want to edit this data? (y/n)")
-        if confirm.lower() == 'y':
-            appointment.set_appointment_name(input("Enter new appointment Name: ") or appointment.get_appointmentname())
-            appointment.set_unitprice(float(input("Enter New Unit Price: ")) or appointment.get_unitprice())
+    def create_appointment(self):
+        """Create a new appointment with token generation"""
+        try:
+            patient_id = input("Enter Patient ID: ").strip()
+            doctor_id = input("Enter Doctor ID: ").strip()
+            reason = input("Enter Reason for Appointment: ").strip()
 
-            #pass the object to dao update
-            if AppointmentManagementLib.dao_service.update_appointment(appointment, searchId):
-                print("updated successfully ....")
+            appointment_id = self.generate_appointment_id()
+
+            appointment = Appointment(
+                appointment_id=appointment_id,
+                patient_id=patient_id,
+                doctor_id=doctor_id,
+                reason=reason
+            )
+
+            if self.appointment_dao.insert_appointment(appointment):
+                print("✅ Appointment created successfully.")
             else:
-                print("something went wrong ....")
+                print("❌ Failed to create appointment.")
 
-    @staticmethod
-    def search_by_id():
-        searchId = int(input("Enter the appointment ID: "))
-        #create a method in DAO
-        appointment = AppointmentManagementLib.dao_service.find_by_appointment_id(searchId)
-        if not appointment:
-            print("Appointment not found")
-            return
-        print(appointment)
-    
-    @staticmethod
-    def disable_appointment():
-        searchId = int(input("Enter the appointment ID: "))
-        #create a method in DAO
-        appointment = AppointmentManagementLib.dao_service.find_by_appointment_id(searchId)
-        if not appointment:
-            print("Appointment not found")
-            return
-        print(appointment)
-        appointment.set_is_active("N")
+        except Exception as e:
+            print("Error creating appointment:", e)
 
-        #pass the object to dao update
-        if AppointmentManagementLib.dao_service.disable_appointment(appointment, searchId):
-            print("updated successfully ....")
-        else:
-            print("something went wrong ....")
+    def display_all_appointments(self):
+        """Display all appointments"""
+        try:
+            appointments = self.appointment_dao.display_all_appointments()
+            if not appointments:
+                print("No appointments found.")
+                return
 
-        # if AppointmentManagementLib.dao_service.disable_appointment(appointment, searchId):
+            print("\n--- All Appointments ---")
+            for appt in appointments:
+                print(f"ID: {appt.appointment_id}, Patient: {appt.patient_id}, "
+                      f"Doctor: {appt.doctor_id}, Date: {appt.appointment_date}, "
+                      f"Reason: {appt.reason}, Token: {appt.token_no}")
+        except Exception as e:
+            print("Error displaying appointments:", e)
 
-    @staticmethod
-    def apply_gst_to_appointment():
-        appointment_id = int(input("Enter the appointment ID to apply GST: "))
-        gst_percent = float(input("Enter GST percentage to apply: "))
-        if AppointmentManagementLib.dao_service.apply_gst(appointment_id, gst_percent):
-            print(f"GST of {gst_percent} applied to appointment ID (appointment_id)")
-        else:
-            print("failed to apply GST")
+    def find_appointment_by_id(self):
+        """Find an appointment by its ID"""
+        try:
+            appt_id = input("Enter Appointment ID: ").strip()
+            appointment = self.appointment_dao.find_by_appointment_id(appt_id)
+            if appointment:
+                print(f"\n--- Appointment Details ---")
+                print(f"ID: {appointment.appointment_id}")
+                print(f"Patient: {appointment.patient_id}")
+                print(f"Doctor: {appointment.doctor_id}")
+                print(f"Date: {appointment.appointment_date}")
+                print(f"Reason: {appointment.reason}")
+                print(f"Token: {appointment.token_no}")
+            else:
+                print("No appointment found with this ID.")
+        except Exception as e:
+            print("Error finding appointment:", e)
