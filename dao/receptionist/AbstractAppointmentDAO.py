@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from models.receptionist.Appointment import Appointment
 from models.receptionist.Patient import Patient 
-import doc
+# import doc
 
 class AppointmentDaoService(ABC):
     @abstractmethod
