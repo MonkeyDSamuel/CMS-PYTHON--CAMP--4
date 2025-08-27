@@ -21,27 +21,133 @@ class PatientManagementLib:
     def add_patient():
         patient = Patient()
 
-        patient.first_name = input("Enter the patient's first name: ")
-        patient.last_name = input("Enter the patient's last name: ")
+        # First Name validation loop
+        while True:
+            first_name = input("Enter the patient's first name: ").strip()
+            try:
+                patient.first_name = first_name
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
 
-        dob_str = input("Enter Date of Birth (dd/mm/yyyy): ")
-        patient.DOB = datetime.strptime(dob_str, "%d/%m/%Y").date()
+        # Last Name validation loop
+        while True:
+            last_name = input("Enter the patient's last name: ").strip()
+            try:
+                patient.last_name = last_name
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
 
-        patient.phone_no = input("Enter the Phone number: ").strip()
-        patient.email = input("Enter the email: ")
-        patient.address = input("Enter the address: ")
-        patient.height = float(input("Enter the height (in cm): "))
-        patient.weight = float(input("Enter the weight (in kg): "))
-        patient.gender = input("Enter the gender: ")
-        patient.blood_group = input("Enter the blood group: ")
-        patient.marital_status = input("Enter the marital status: ")
-        patient.current_medications = input("Enter the current medications: ")
-        patient.emergency_contact = input("Enter emergency contact number: ").strip()
+        # Date of Birth validation loop
+        while True:
+            dob_str = input("Enter Date of Birth (dd/mm/yyyy): ").strip()
+            try:
+                patient.DOB = datetime.strptime(dob_str, "%d/%m/%Y").date()
+                break
+            except ValueError:
+                print("❌ Invalid date format. Please use dd/mm/yyyy format.")
+
+        # Phone Number validation loop
+        while True:
+            phone_no = input("Enter the Phone number: ").strip()
+            try:
+                patient.phone_no = phone_no
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
+
+        # Email validation loop with improved regex
+        while True:
+            email = input("Enter the email: ").strip()
+            try:
+                patient.email = email
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
+
+        # Address validation loop
+        while True:
+            address = input("Enter the address: ").strip()
+            try:
+                patient.address = address
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
+
+        # Height validation loop
+        while True:
+            try:
+                height_input = input("Enter the height (in cm): ").strip()
+                height = float(height_input)
+                patient.height = height
+                break
+            except ValueError:
+                print("❌ Height must be a valid number. Please try again.")
+
+        # Weight validation loop
+        while True:
+            try:
+                weight_input = input("Enter the weight (in kg): ").strip()
+                weight = float(weight_input)
+                patient.weight = weight
+                break
+            except ValueError:
+                print("❌ Weight must be a valid number. Please try again.")
+
+        # Gender validation loop with format guidance
+        print("Gender options: 'm' (Male), 'f' (Female), 'o' (Other)")
+        while True:
+            gender = input("Enter the gender (m/f/o): ").strip().lower()
+            try:
+                patient.gender = gender
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please enter 'm', 'f', or 'o'.")
+
+        # Blood Group validation loop (accept lowercase, will display uppercase)
+        print("Blood group options: A+, A-, B+, B-, O+, O-, AB+, AB-")
+        while True:
+            blood_group = input("Enter the blood group: ").strip()
+            try:
+                patient.blood_group = blood_group
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
+
+        # Marital Status validation loop
+        print("Marital status options: 'm' (Married), 'um' (Unmarried), 'o' (Other)")
+        while True:
+            marital_status = input("Enter the marital status (m/um/o): ").strip().lower()
+            try:
+                patient.marital_status = marital_status
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please enter 'm', 'um', or 'o'.")
+
+        # Current Medications validation loop
+        while True:
+            current_medications = input("Enter the current medications: ").strip()
+            try:
+                patient.current_medications = current_medications
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
+
+        # Emergency Contact validation loop
+        while True:
+            emergency_contact = input("Enter emergency contact number: ").strip()
+            try:
+                patient.emergency_contact = emergency_contact
+                break
+            except ValueError as e:
+                print(f"❌ {e}. Please try again.")
 
         if PatientManagementLib.dao_service.insert_patient(patient):
-            print("Inserted Successfully!!")
+            print("✅ Insertion successful.")
+            print(f"Patient ID: {patient.patient_id}")
         else:
-            print("Something went wrong...")
+            print("❌ Something went wrong...")
 
     @staticmethod
     def update_patient():

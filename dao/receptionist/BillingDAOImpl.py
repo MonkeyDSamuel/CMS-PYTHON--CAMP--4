@@ -10,30 +10,30 @@ class BillingDaoImplementation(BillingDaoService):
     # SQL Queries
     # =============================
     QUERY_DISPLAY_ALL = """
-        SELECT bill_id, appointment_id, total_bill, bill_date 
-        FROM billing
+        SELECT bill_id, appointment_id, total_bill, Billing_date 
+        FROM appointment_billing
     """
     QUERY_INSERT = """
-        INSERT INTO billing (bill_id, appointment_id, total_bill, bill_date) 
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO appointment_billing (bill_id, appointment_id, total_bill) 
+        VALUES (%s, %s, %s)
     """
     QUERY_FIND_BY_ID = """
-        SELECT bill_id, appointment_id, total_bill, bill_date 
-        FROM billing WHERE bill_id = %s
+        SELECT bill_id, appointment_id, total_bill, Billing_date 
+        FROM appointment_billing WHERE bill_id = %s
     """
     QUERY_UPDATE = """
-        UPDATE billing 
-        SET appointment_id = %s, total_bill = %s, bill_date = %s 
+        UPDATE appointment_billing 
+        SET appointment_id = %s, total_bill = %s 
         WHERE bill_id = %s
     """
     QUERY_DELETE = """
-        DELETE FROM billing WHERE bill_id = %s
+        DELETE FROM appointment_billing WHERE bill_id = %s
     """
     QUERY_GET_LAST_ID = """
-        SELECT bill_id FROM billing ORDER BY bill_id DESC LIMIT 1
+        SELECT bill_id FROM appointment_billing ORDER BY bill_id DESC LIMIT 1
     """
     QUERY_DOCTOR_FEE_BY_APPT = """
-        SELECT d.consultation_fee
+        SELECT d.Charge
         FROM appointment a
         JOIN doctor d ON a.doctor_id = d.doctor_id
         WHERE a.appointment_id = %s
@@ -83,7 +83,7 @@ class BillingDaoImplementation(BillingDaoService):
             Billing(
                 bill_id=row[0],
                 appointment_id=row[1],
-                total_bill=row[2],
+                doctor_fee=row[2],
                 bill_date=row[3]
             )
             for row in rows
@@ -94,15 +94,13 @@ class BillingDaoImplementation(BillingDaoService):
     # =============================
     def insert_bill(self, billing: Billing) -> bool:
         try:
-            # Auto-generate Bill ID + set bill date
+            # Auto-generate Bill ID
             billing.bill_id = self.generate_bill_id()
-            billing.bill_date = date.today()
+            # Ensure total is computed (doctor_fee + additional_charges)
+            if billing.total_bill is None:
+                billing.calculate_total_bill()
 
-            # Optionally: auto-fetch doctor’s fee if not set
-            if billing.total_bill is None or billing.total_bill == 0:
-                billing.total_bill = self.fetch_doctor_fee_by_appointment(billing.appointment_id)
-
-            values = (billing.bill_id, billing.appointment_id, billing.total_bill, billing.bill_date)
+            values = (billing.bill_id, billing.appointment_id, billing.total_bill)
             self.cursor.execute(self.QUERY_INSERT, values)
             self.conn.commit()
             return True
@@ -120,7 +118,7 @@ class BillingDaoImplementation(BillingDaoService):
             return Billing(
                 bill_id=row[0],
                 appointment_id=row[1],
-                total_bill=row[2],
+                doctor_fee=row[2],
                 bill_date=row[3]
             )
         return None
@@ -130,7 +128,7 @@ class BillingDaoImplementation(BillingDaoService):
     # =============================
     def update_bill(self, billing: Billing, bill_id: str) -> bool:
         try:
-            values = (billing.appointment_id, billing.total_bill, billing.bill_date, bill_id)
+            values = (billing.appointment_id, billing.total_bill, bill_id)
             self.cursor.execute(self.QUERY_UPDATE, values)
             self.conn.commit()
             return self.cursor.rowcount > 0

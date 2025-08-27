@@ -21,17 +21,21 @@ class BillingManagementLib:
     # =================================
     # 2. Insert new bill
     # =================================
-    def insert_bill(self, appointment_id, total_bill):
+    def insert_bill(self, appointment_id, doctor_fee=None):
         try:
+            # If doctor_fee not provided, fetch it from DB using appointment_id
+            if doctor_fee is None or doctor_fee == 0:
+                doctor_fee = self.dao.fetch_doctor_fee_by_appointment(appointment_id)
+
             bill = Billing(
                 appointment_id=appointment_id,
-                total_bill=total_bill,
+                doctor_fee=doctor_fee,
                 bill_date=date.today()
             )
             if self.dao.insert_bill(bill):
-                print("✅ Bill inserted successfully!")
-                # After insertion, bill.bill_id will already be set in DAO
-                print(bill)
+                # Print per requirement
+                print("Billing Successful!")
+                print(f"Total bil amount = {bill.total_bill}")
             else:
                 print("❌ Failed to insert bill.")
         except Exception as e:
@@ -53,7 +57,7 @@ class BillingManagementLib:
     # =================================
     # 4. Update bill
     # =================================
-    def update_bill(self, bill_id, appointment_id=None, total_bill=None):
+    def update_bill(self, bill_id, appointment_id=None, doctor_fee=None, additional_charges=None):
         bill = self.dao.find_by_bill_id(bill_id)
         if not bill:
             print(f"❌ Bill ID {bill_id} not found.")
@@ -61,8 +65,10 @@ class BillingManagementLib:
 
         if appointment_id:
             bill.appointment_id = appointment_id
-        if total_bill:
-            bill.total_bill = total_bill
+        if doctor_fee is not None:
+            bill.doctor_fee = doctor_fee
+        if additional_charges is not None:
+            bill.additional_charges = additional_charges
 
         bill.bill_date = date.today()  # always refresh date on update
 
@@ -91,11 +97,16 @@ class BillingManagementLib:
     def create_bill(self):
         try:
             appointment_id = input("Enter Appointment ID: ").strip()
-            total_bill_str = input("Enter Total Bill (leave blank to auto): ").strip()
-            total_bill = int(total_bill_str) if total_bill_str else 0
+            if not appointment_id:
+                print("❌ Appointment ID is required.")
+                return
 
-            self.insert_bill(appointment_id, total_bill)
-        except ValueError:
-            print("❌ Invalid amount entered for total bill.")
+            # Auto-fetch doctor's charge based on appointment_id
+            doctor_fee = self.dao.fetch_doctor_fee_by_appointment(appointment_id)
+            if doctor_fee is None or doctor_fee == 0:
+                print("❌ Unable to determine doctor's charge for this appointment.")
+                return
+
+            self.insert_bill(appointment_id, doctor_fee)
         except Exception as e:
             print("Error creating bill:", e)

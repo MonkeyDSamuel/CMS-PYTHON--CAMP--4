@@ -8,7 +8,11 @@ class PatientDaoImplementation(PatientDaoService):
     """Implementation for abstract class"""
 
     # SQL Queries
-    DISPLAY_ALL = "SELECT * FROM patient WHERE is_active = 1"
+    DISPLAY_ALL = (
+        "SELECT patient_id, first_name, last_name, dob AS DOB, phone_no, email_id, address, "
+        "height, weight, gender, blood_group, marital_status, current_medications, emergency_contact, is_active "
+        "FROM patient WHERE is_active = 1"
+    )
     
     GET_LAST_ID = "SELECT patient_id FROM patient ORDER BY patient_id DESC LIMIT 1"
     
@@ -21,7 +25,11 @@ class PatientDaoImplementation(PatientDaoService):
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     
-    FIND_BY_ID = "SELECT * FROM patient WHERE patient_id = %s"
+    FIND_BY_ID = (
+        "SELECT patient_id, first_name, last_name, dob AS DOB, phone_no, email_id, address, "
+        "height, weight, gender, blood_group, marital_status, current_medications, emergency_contact, is_active "
+        "FROM patient WHERE patient_id = %s"
+    )
     
     UPDATE_PATIENT = """
         UPDATE patient 
@@ -92,6 +100,10 @@ class PatientDaoImplementation(PatientDaoService):
                 self._to_active_tinyint(patient.is_active)
             ))
             self.conn.commit()
+            
+            # Update the patient object with the generated ID
+            patient.patient_id = new_patient_id
+            
             return cursor.rowcount == 1
         except Exception as e:
             print("Error inserting patient: ", e)

@@ -79,11 +79,6 @@ class Patient:
     def DOB(self, value: date):
         if value and not isinstance(value, date):
             raise ValueError("DOB must be a datetime.date object")
-        if value:
-            today = date.today()
-            age = today.year - value.year - ((today.month, today.day) < (value.month, value.day))
-            if not (18 <= age <= 60):
-                raise ValueError("Patient age must be between 18 and 60")
         self.__DOB = value
 
     # Phone Number
@@ -98,6 +93,24 @@ class Patient:
                 raise ValueError("Phone number must be 10 digits starting with 9, 8, or 7")
         self.__phone_no = value
 
+    # Blood Group
+    @property
+    def blood_group(self):
+        return self.__blood_group
+
+    @blood_group.setter
+    def blood_group(self, value: str):
+        if value is None:
+            self.__blood_group = None
+            return
+        # Accept lowercase input and convert to uppercase
+        normalized = value.strip().upper()
+        valid_groups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+        if normalized in valid_groups:
+            self.__blood_group = normalized
+        else:
+            raise ValueError("Invalid blood group. Must be one of: A+, A-, B+, B-, O+, O-, AB+, AB-")
+
     # Email
     @property
     def email(self):
@@ -105,11 +118,35 @@ class Patient:
 
     @email.setter
     def email(self, value: str):
-        if value:
-            pattern = r"^[\w\.-]+@[\w\.-]+\.(com|in|org|net)$"
-            if not re.match(pattern, value):
-                raise ValueError("Invalid email format")
-        self.__email = value
+        if value is None:
+            self.__email = None
+            return
+        if not isinstance(value, str):
+            raise ValueError("Email must be a string")
+        
+        # Check for @ symbol
+        if '@' not in value:
+            raise ValueError("Email must contain '@' symbol")
+        
+        # Check for dot after @
+        parts = value.split('@')
+        if len(parts) != 2:
+            raise ValueError("Invalid email format")
+        
+        domain_part = parts[1]
+        if '.' not in domain_part:
+            raise ValueError("Email domain must contain a dot (.)")
+        
+        # Check for 2-3 letters after the last dot
+        domain_parts = domain_part.split('.')
+        if len(domain_parts) < 2:
+            raise ValueError("Invalid domain format")
+        
+        tld = domain_parts[-1]
+        if not (2 <= len(tld) <= 3):
+            raise ValueError("Domain extension must be 2-3 letters (e.g., com, in, org)")
+        
+        self.__email = value.strip()
 
     # Address
     @property
@@ -169,18 +206,6 @@ class Patient:
             self.__gender = title_val
             return
         raise ValueError("Gender must be M, F, O or Male, Female, Other")
-
-    # Blood Group
-    @property
-    def blood_group(self):
-        return self.__blood_group
-
-    @blood_group.setter
-    def blood_group(self, value: str):
-        valid_groups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
-        if value not in valid_groups:
-            raise ValueError("Invalid blood group")
-        self.__blood_group = value
 
     # Marital Status
     @property
