@@ -1,4 +1,5 @@
 import configparser
+import os
 import pymysql
 from pymysql.err import MySQLError
 
@@ -26,7 +27,9 @@ class DBConnection:
         try:
             #load the configuration file
             config=configparser.ConfigParser()
-            config.read("db_config.ini")
+            base_dir = os.path.dirname(__file__)
+            config_path = os.path.abspath(os.path.join(base_dir, "..", "db_config.ini"))
+            config.read(config_path)
             #establish the Mysql connection
             self.connection=pymysql.connect(
                 host=config.get("mysql","host"),
