@@ -1,32 +1,14 @@
-# models/medicine.py
+class Stock:
+    """Represents medicine stock information."""
 
-class Medicine:
-    def __init__(self, med_id: int, name: str, price: float, stock: int):
-        """
-        Model representing a medicine item in stock.
-        :param med_id: Unique identifier for medicine
-        :param name: Medicine name
-        :param price: Price per unit
-        :param stock: Available stock quantity
-        """
-        self.med_id = med_id
-        self.name = name
-        self.price = price
-        self.stock = stock
-
-    def update_stock(self, quantity: int):
-        """
-        Update medicine stock (positive for adding, negative for reducing).
-        """
-        if self.stock + quantity < 0:
-            raise ValueError(f"Not enough stock for {self.name}")
-        self.stock += quantity
-
-    def is_available(self, qty: int) -> bool:
-        """
-        Check if required quantity is available.
-        """
-        return self.stock >= qty
+    def __init__(self, stock_id: str, medicine_id: str, current_stock: int, stock_status: str):
+        self.stock_id = stock_id
+        self.medicine_id = medicine_id
+        self.current_stock = current_stock
+        self.stock_status = stock_status
 
     def __str__(self):
-        return f"[{self.med_id}] {self.name} | ₹{self.price:.2f} | Stock: {self.stock}"
+        return (
+            f"Stock(stock_id={self.stock_id}, medicine_id={self.medicine_id}, "
+            f"current_stock={self.current_stock}, status={self.stock_status})"
+        )
