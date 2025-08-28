@@ -184,7 +184,7 @@ class AppointmentManagementLib:
                     date_str = str(appt.appointment_date)
                 print(f"ID: {appt.appointment_id}, Patient: {appt.patient_id}, "
                       f"Doctor: {appt.doctor_id}, Date: {date_str}, "
-                      f"Reason: {appt.reason}, Token: {appt.token_no}")
+                      f"Reason: {appt.reason}, Token: {appt.token_no}, Status: {getattr(appt, 'app_status', None)}")
         except Exception as e:
             print("Error displaying appointments:", e)
 
@@ -205,7 +205,154 @@ class AppointmentManagementLib:
                 print(f"Date: {date_str}")
                 print(f"Reason: {appointment.reason}")
                 print(f"Token: {appointment.token_no}")
+                print(f"Status: {getattr(appointment, 'app_status', None)}")
             else:
                 print("No appointment found with this ID.")
         except Exception as e:
             print("Error finding appointment:", e)
+
+    def search_appointments_by_date(self):
+        """Search appointments by date (defaults to today if left empty)"""
+        try:
+            from datetime import datetime, date
+            
+            date_input = input("Enter Date to search (dd/mm/yyyy) (press Enter for today): ").strip()
+            
+            if not date_input:
+                search_date = date.today()
+                print(f"Searching for appointments on: {search_date.strftime('%d/%m/%Y')}")
+            else:
+                try:
+                    search_date = datetime.strptime(date_input, "%d/%m/%Y").date()
+                except ValueError:
+                    print("❌ Invalid date format. Please use dd/mm/yyyy format.")
+                    return
+            
+            appointments = self.appointment_dao.find_appointments_by_date(search_date)
+            
+            if not appointments:
+                print(f"No appointments found for {search_date.strftime('%d/%m/%Y')}")
+                return
+            
+            print(f"\n--- Appointments on {search_date.strftime('%d/%m/%Y')} ---")
+            for appt in appointments:
+                try:
+                    date_str = appt.appointment_date.strftime('%d/%m/%Y')
+                except Exception:
+                    date_str = str(appt.appointment_date)
+                print(f"ID: {appt.appointment_id}, Patient: {appt.patient_id}, "
+                      f"Doctor: {appt.doctor_id}, Date: {date_str}, "
+                      f"Reason: {appt.reason}, Token: {appt.token_no}, Status: {getattr(appt, 'app_status', None)}")
+                      
+        except Exception as e:
+            print("Error searching appointments by date:", e)
+
+    def view_appointments_by_doctor(self):
+        """View all appointments for a specific doctor"""
+        try:
+            doctor_id = input("Enter Doctor ID: ").strip()
+            if not doctor_id:
+                print("❌ Doctor ID is required.")
+                return
+
+            appointments = self.appointment_dao.find_by_doctor_id(doctor_id)
+            
+            if not appointments:
+                print(f"No appointments found for Doctor ID: {doctor_id}")
+                return
+            
+            print(f"\n--- Appointments for Doctor ID: {doctor_id} ---")
+            for appt in appointments:
+                try:
+                    date_str = appt.appointment_date.strftime('%d/%m/%Y')
+                except Exception:
+                    date_str = str(appt.appointment_date)
+                print(f"ID: {appt.appointment_id}, Patient: {appt.patient_id}, "
+                      f"Date: {date_str}, Reason: {appt.reason}, Token: {appt.token_no}, Status: {getattr(appt, 'app_status', None)}")
+                      
+        except Exception as e:
+            print("Error viewing appointments by doctor:", e)
+
+    def cancel_appointment(self):
+        """Cancel an appointment, set status to CANCELLED and free its token."""
+        try:
+            appt_id = input("Enter Appointment ID to cancel: ").strip()
+            if not appt_id:
+                print("❌ Appointment ID is required.")
+                return
+            appt = self.appointment_dao.find_by_appointment_id(appt_id)
+            if not appt:
+                print("❌ Appointment not found.")
+                return
+            confirm = input(f"Are you sure you want to cancel appointment {appt_id}? (y/n): ")
+            if confirm.lower() != 'y':
+                return
+            if self.appointment_dao.cancel_appointment(appt_id):
+                print("✅ Appointment cancelled. Token freed.")
+            else:
+                print("❌ Failed to cancel appointment.")
+        except Exception as e:
+            print("Error cancelling appointment:", e)
+
+    def update_appointment_date(self):
+        """Update appointment date; free old token; if ACTIVE, auto-assign token for new date."""
+        try:
+            from datetime import datetime
+            appt_id = input("Enter Appointment ID to update: ").strip()
+            if not appt_id:
+                print("❌ Appointment ID is required.")
+                return
+            appt = self.appointment_dao.find_by_appointment_id(appt_id)
+            if not appt:
+                print("❌ Appointment not found.")
+                return
+            new_date_input = input("Enter new date (dd/mm/yyyy): ").strip()
+            try:
+                new_date = datetime.strptime(new_date_input, "%d/%m/%Y").date()
+            except ValueError:
+                print("❌ Invalid date format. Use dd/mm/yyyy.")
+                return
+            confirm = input(f"Confirm changing {appt_id} to {new_date.strftime('%d/%m/%Y')}? (y/n): ")
+            if confirm.lower() != 'y':
+                return
+            if self.appointment_dao.update_appointment_date(appt_id, new_date):
+                print("✅ Appointment date updated. Token adjusted accordingly.")
+            else:
+                print("❌ Failed to update appointment date (token limit or error).")
+        except Exception as e:
+            print("Error updating appointment date:", e)
+
+    def view_pending_appointments_by_date(self):
+        """View appointments with app_status='PENDING' for a given date (default today)."""
+        try:
+            from datetime import datetime, date
+
+            date_input = input("Enter Date to view pending (dd/mm/yyyy) (press Enter for today): ").strip()
+
+            if not date_input:
+                search_date = date.today()
+                print(f"Searching for pending appointments on: {search_date.strftime('%d/%m/%Y')}")
+            else:
+                try:
+                    search_date = datetime.strptime(date_input, "%d/%m/%Y").date()
+                except ValueError:
+                    print("❌ Invalid date format. Please use dd/mm/yyyy format.")
+                    return
+
+            appointments = self.appointment_dao.find_pending_appointments_by_date(search_date)
+
+            if not appointments:
+                print(f"No pending appointments found for {search_date.strftime('%d/%m/%Y')}")
+                return
+
+            print(f"\n--- Pending Appointments on {search_date.strftime('%d/%m/%Y')} ---")
+            for appt in appointments:
+                try:
+                    date_str = appt.appointment_date.strftime('%d/%m/%Y')
+                except Exception:
+                    date_str = str(appt.appointment_date)
+                print(f"ID: {appt.appointment_id}, Patient: {appt.patient_id}, "
+                      f"Doctor: {appt.doctor_id}, Date: {date_str}, "
+                      f"Reason: {appt.reason}, Token: {appt.token_no}, Status: {getattr(appt, 'app_status', None)}")
+        except Exception as e:
+            print("Error viewing pending appointments by date:", e)

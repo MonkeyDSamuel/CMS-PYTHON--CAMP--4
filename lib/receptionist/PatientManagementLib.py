@@ -158,24 +158,101 @@ class PatientManagementLib:
             print("Patient not found")
             return
 
-        print("Current details:", patient)
+        print("Current details:")
+        print(patient)
         confirm = input("Do you want to edit this data? (y/n): ")
         if confirm.lower() != 'y':
             return
 
-        # Update only if user provides a value, else keep old
-        new_first_name = input(f"Enter new first name ({patient.first_name}): ") or patient.first_name
-        new_last_name = input(f"Enter new last name ({patient.last_name}): ") or patient.last_name
-        new_phone = input(f"Enter new phone no ({patient.phone_no}): ") or patient.phone_no
-        new_email = input(f"Enter new email ({patient.email}): ") or patient.email
-        new_address = input(f"Enter new address ({patient.address}): ") or patient.address
+        # Helper to keep or update string fields
+        def _keep_or_update(prompt_label: str, current_val: str) -> str:
+            entered = input(f"Enter new {prompt_label} ({current_val}): ").strip()
+            return current_val if entered == '' else entered
 
-        # Assign back
-        patient.first_name = new_first_name
-        patient.last_name = new_last_name
-        patient.phone_no = new_phone.strip()
-        patient.email = new_email
-        patient.address = new_address
+        # Names
+        try:
+            patient.first_name = _keep_or_update("first name", patient.first_name)
+        except ValueError as e:
+            print(f"❌ {e}")
+        try:
+            patient.last_name = _keep_or_update("last name", patient.last_name)
+        except ValueError as e:
+            print(f"❌ {e}")
+
+        # DOB
+        from datetime import datetime
+        dob_input = input(f"Enter new DOB dd/mm/yyyy ({patient.DOB}): ").strip()
+        if dob_input:
+            try:
+                patient.DOB = datetime.strptime(dob_input, "%d/%m/%Y").date()
+            except ValueError:
+                print("❌ Invalid date. Keeping existing DOB.")
+
+        # Phone and Email and Address
+        try:
+            patient.phone_no = _keep_or_update("phone no", patient.phone_no)
+        except ValueError as e:
+            print(f"❌ {e}")
+        try:
+            patient.email = _keep_or_update("email", patient.email)
+        except ValueError as e:
+            print(f"❌ {e}")
+        try:
+            patient.address = _keep_or_update("address", patient.address)
+        except ValueError as e:
+            print(f"❌ {e}")
+
+        # Height
+        height_input = input(f"Enter new height in cm ({patient.height}): ").strip()
+        if height_input:
+            try:
+                patient.height = float(height_input)
+            except ValueError:
+                print("❌ Invalid height. Keeping existing value.")
+
+        # Weight
+        weight_input = input(f"Enter new weight in kg ({patient.weight}): ").strip()
+        if weight_input:
+            try:
+                patient.weight = float(weight_input)
+            except ValueError:
+                print("❌ Invalid weight. Keeping existing value.")
+
+        # Gender
+        gender_input = input(f"Enter gender (m/f/o) ({patient.gender}): ").strip()
+        if gender_input:
+            try:
+                patient.gender = gender_input
+            except ValueError as e:
+                print(f"❌ {e}. Keeping existing gender.")
+
+        # Blood group
+        bg_input = input(f"Enter blood group ({patient.blood_group}): ").strip()
+        if bg_input:
+            try:
+                patient.blood_group = bg_input
+            except ValueError as e:
+                print(f"❌ {e}. Keeping existing blood group.")
+
+        # Marital status
+        ms_input = input(f"Enter marital status (m/um/o) ({patient.marital_status}): ").strip()
+        if ms_input:
+            try:
+                patient.marital_status = ms_input
+            except ValueError as e:
+                print(f"❌ {e}. Keeping existing marital status.")
+
+        # Current medications
+        try:
+            patient.current_medications = _keep_or_update("current medications", patient.current_medications)
+        except ValueError as e:
+            print(f"❌ {e}")
+
+        # Emergency contact
+        try:
+            patient.emergency_contact = _keep_or_update("emergency contact", patient.emergency_contact)
+        except ValueError as e:
+            print(f"❌ {e}")
 
         if PatientManagementLib.dao_service.update_patient(patient, search_id):
             print("Updated successfully.")
@@ -193,6 +270,19 @@ class PatientManagementLib:
             print(patient)
 
     @staticmethod
+    def search_by_name():
+        name = input("Enter name to search (first or last, partial allowed): ").strip()
+        if not name:
+            print("Please enter a valid name.")
+            return
+        patients = PatientManagementLib.dao_service.find_by_name(name)
+        if not patients:
+            print("No matching patients found.")
+            return
+        for patient in patients:
+            print(patient)
+
+    @staticmethod
     def disable_patient():
         search_id = input("Enter the patient ID (e.g., P0000001): ").strip()
         patient = PatientManagementLib.dao_service.find_by_patient_id(search_id)
@@ -205,9 +295,9 @@ class PatientManagementLib:
         if confirm.lower() != 'y':
             return
 
-        # set status to 'N' and send both patient entity and id to DAO
+        # set status to 'N' and send both patient entity and id to DAO; this also cancels appointments and frees tokens
         patient.is_active = 'N'
         if PatientManagementLib.dao_service.disable_patient(patient, search_id):
-            print("Patient disabled successfully.")
+            print("Patient disabled successfully. All appointments cancelled and tokens freed.")
         else:
             print("Something went wrong...")

@@ -21,9 +21,22 @@ class AppointmentDaoImplementation(AppointmentDaoService):
 		"WHERE Appointment_id = %s"
 	)
 	DELETE_APPOINTMENT = "DELETE FROM appointment WHERE Appointment_id = %s"
+	FIND_BY_DATE = "SELECT * FROM appointment WHERE DATE(Appointment_date) = %s"
+	FIND_PENDING_BY_DATE = "SELECT * FROM appointment WHERE DATE(Appointment_date) = %s AND app_status = 'PENDING'"
+	CANCEL_APPOINTMENT_STATUS = "UPDATE appointment SET app_status = %s WHERE Appointment_id = %s"
+	DELETE_TOKEN_FOR_APPT = (
+		"DELETE t FROM app_token t "
+		"JOIN appointment a ON a.Doctor_id = t.doc_id "
+		"AND a.token_no = t.token "
+		"AND DATE(a.Appointment_date) = t.token_date "
+		"WHERE a.Appointment_id = %s"
+	)
+	GET_APPT_DOCTOR_AND_STATUS = "SELECT Doctor_id, app_status FROM appointment WHERE Appointment_id = %s"
+	UPDATE_APPT_DATE_CLEAR_TOKEN = "UPDATE appointment SET Appointment_date = %s, token_no = NULL WHERE Appointment_id = %s"
+	UPDATE_APPT_TOKEN = "UPDATE appointment SET token_no = %s WHERE Appointment_id = %s"
 
 	# New helper queries
-	QUERY_PATIENT_EXISTS = "SELECT 1 FROM patient WHERE patient_id = %s"
+	QUERY_PATIENT_EXISTS = "SELECT 1 FROM patient WHERE patient_id = %s AND is_active = 1"
 	QUERY_DOCTOR_EXISTS = "SELECT 1 FROM doctor WHERE doctor_id = %s"
 	QUERY_DOCTOR_DAYS = "SELECT Consultation_days FROM doctor WHERE doctor_id = %s"
 	QUERY_TOKEN_COUNT_FOR_DAY = (
@@ -167,7 +180,8 @@ class AppointmentDaoImplementation(AppointmentDaoService):
 					doctor_id=row["Doctor_id"],
 					appointment_date=row["Appointment_date"],
 					reason=row["Reason"],
-					token_no=row["token_no"]
+					token_no=row["token_no"],
+					app_status=row.get("app_status") or row.get("App_status") or row.get("APP_STATUS")
 				))
 		except Exception as e:
 			print("Error fetching appointments:", e)
@@ -188,7 +202,8 @@ class AppointmentDaoImplementation(AppointmentDaoService):
 					doctor_id=row["Doctor_id"],
 					appointment_date=row["Appointment_date"],
 					reason=row["Reason"],
-					token_no=row["token_no"]
+					token_no=row["token_no"],
+					app_status=row.get("app_status") or row.get("App_status") or row.get("APP_STATUS")
 				)
 		except Exception as e:
 			print("Error finding appointment by ID:", e)
@@ -209,7 +224,8 @@ class AppointmentDaoImplementation(AppointmentDaoService):
 					doctor_id=row["Doctor_id"],
 					appointment_date=row["Appointment_date"],
 					reason=row["Reason"],
-					token_no=row["token_no"]
+					token_no=row["token_no"],
+					app_status=row.get("app_status") or row.get("App_status") or row.get("APP_STATUS")
 				))
 		except Exception as e:
 			print("Error finding appointments by patient ID:", e)
@@ -230,10 +246,55 @@ class AppointmentDaoImplementation(AppointmentDaoService):
 					doctor_id=row["Doctor_id"],
 					appointment_date=row["Appointment_date"],
 					reason=row["Reason"],
-					token_no=row["token_no"]
+					token_no=row["token_no"],
+					app_status=row.get("app_status") or row.get("App_status") or row.get("APP_STATUS")
 				))
 		except Exception as e:
 			print("Error finding appointments by doctor ID:", e)
+		finally:
+			cursor.close()
+		return appointments
+
+	def find_appointments_by_date(self, date: str) -> List[Appointment]:
+		appointments = []
+		try:
+			cursor = self.conn.cursor(DictCursor)
+			cursor.execute(self.FIND_BY_DATE, (date,))
+			rows = cursor.fetchall()
+			for row in rows:
+				appointments.append(Appointment(
+					appointment_id=row["Appointment_id"],
+					patient_id=row["Patient_id"],
+					doctor_id=row["Doctor_id"],
+					appointment_date=row["Appointment_date"],
+					reason=row["Reason"],
+					token_no=row["token_no"],
+					app_status=row.get("app_status") or row.get("App_status") or row.get("APP_STATUS")
+				))
+		except Exception as e:
+			print("Error finding appointments by date:", e)
+		finally:
+			cursor.close()
+		return appointments
+
+	def find_pending_appointments_by_date(self, date: str) -> List[Appointment]:
+		appointments = []
+		try:
+			cursor = self.conn.cursor(DictCursor)
+			cursor.execute(self.FIND_PENDING_BY_DATE, (date,))
+			rows = cursor.fetchall()
+			for row in rows:
+				appointments.append(Appointment(
+					appointment_id=row["Appointment_id"],
+					patient_id=row["Patient_id"],
+					doctor_id=row["Doctor_id"],
+					appointment_date=row["Appointment_date"],
+					reason=row["Reason"],
+					token_no=row["token_no"],
+					app_status=row.get("app_status") or row.get("App_status") or row.get("APP_STATUS")
+				))
+		except Exception as e:
+			print("Error finding pending appointments by date:", e)
 		finally:
 			cursor.close()
 		return appointments
@@ -285,14 +346,73 @@ class AppointmentDaoImplementation(AppointmentDaoService):
 				pass
 
 	def cancel_appointment(self, appointment_id: str) -> bool:
-		# If a status column exists, consider updating it instead of deleting.
+		# New behavior: set status to CANCELLED and free the reserved token
 		try:
 			cursor = self.conn.cursor()
-			cursor.execute(self.DELETE_APPOINTMENT, (appointment_id,))
+			# Update status
+			cursor.execute(self.CANCEL_APPOINTMENT_STATUS, ("CANCELLED", appointment_id))
+			# Free token
+			cursor.execute(self.DELETE_TOKEN_FOR_APPT, (appointment_id,))
 			self.conn.commit()
-			return cursor.rowcount > 0
+			return True
 		except Exception as e:
 			print("Error cancelling appointment:", e)
+			try:
+				self.conn.rollback()
+			except Exception:
+				pass
+			return False
+		finally:
+			try:
+				cursor.close()
+			except Exception:
+				pass
+
+	def update_appointment_date(self, appointment_id: str, new_date) -> bool:
+		"""Update appointment date, free old token, and assign new token if ACTIVE."""
+		try:
+			cursor = self.conn.cursor()
+			# Get doctor and current status
+			cursor.execute(self.GET_APPT_DOCTOR_AND_STATUS, (appointment_id,))
+			row = cursor.fetchone()
+			if not row:
+				return False
+			doctor_id, status = row[0], row[1]
+			# Free old token tied to this appointment
+			cursor.execute(self.DELETE_TOKEN_FOR_APPT, (appointment_id,))
+			# Update date and clear token
+			cursor.execute(self.UPDATE_APPT_DATE_CLEAR_TOKEN, (new_date, appointment_id))
+			# If active, assign a new token for the new date
+			if status == 'ACTIVE':
+				# Compute next token and ensure within limit
+				cursor2 = self.conn.cursor()
+				try:
+					cursor2.execute(self.QUERY_MAX_TOKEN_FOR_DAY, (doctor_id, new_date))
+					row2 = cursor2.fetchone()
+					current_max = int(row2[0]) if row2 and row2[0] is not None else 0
+					next_token = current_max + 1
+					if next_token > 25:
+						raise Exception('Token limit reached for selected date')
+					# Insert token reservation
+					cursor2.execute(self.QUERY_LAST_TOKEN_ID)
+					last = cursor2.fetchone()
+					next_id = 1 if not last or last[0] is None else int(last[0]) + 1
+					cursor.execute(self.INSERT_TOKEN, (next_id, doctor_id, next_token, new_date))
+					# Update appointment with new token
+					cursor.execute(self.UPDATE_APPT_TOKEN, (next_token, appointment_id))
+				finally:
+					try:
+						cursor2.close()
+					except Exception:
+						pass
+			self.conn.commit()
+			return True
+		except Exception as e:
+			print("Error updating appointment date:", e)
+			try:
+				self.conn.rollback()
+			except Exception:
+				pass
 			return False
 		finally:
 			try:

@@ -2,6 +2,7 @@ from db.db_connection import DBConnection
 from dao.receptionist.AbstractBillingDAO import BillingDaoService
 from models.receptionist.Billing import Billing
 from datetime import date
+from typing import List
 
 
 class BillingDaoImplementation(BillingDaoService):
@@ -29,6 +30,10 @@ class BillingDaoImplementation(BillingDaoService):
     QUERY_DELETE = """
         DELETE FROM appointment_billing WHERE bill_id = %s
     """
+    QUERY_FIND_BY_DATE = """
+        SELECT bill_id, appointment_id, total_bill, Billing_date 
+        FROM appointment_billing WHERE DATE(Billing_date) = %s
+    """
     QUERY_GET_LAST_ID = """
         SELECT bill_id FROM appointment_billing ORDER BY bill_id DESC LIMIT 1
     """
@@ -37,6 +42,9 @@ class BillingDaoImplementation(BillingDaoService):
         FROM appointment a
         JOIN doctor d ON a.doctor_id = d.doctor_id
         WHERE a.appointment_id = %s
+    """
+    QUERY_UPDATE_APPT_STATUS_ACTIVE = """
+        UPDATE appointment SET app_status = %s WHERE Appointment_id = %s
     """
 
     # =============================
@@ -101,11 +109,19 @@ class BillingDaoImplementation(BillingDaoService):
                 billing.calculate_total_bill()
 
             values = (billing.bill_id, billing.appointment_id, billing.total_bill)
+            # Insert bill
             self.cursor.execute(self.QUERY_INSERT, values)
+            # Update appointment status to ACTIVE after successful billing insert
+            self.cursor.execute(self.QUERY_UPDATE_APPT_STATUS_ACTIVE, ("ACTIVE", billing.appointment_id))
+            # Commit both operations together
             self.conn.commit()
             return True
         except Exception as e:
             print("Error inserting bill:", e)
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
             return False
 
     # =============================
@@ -147,3 +163,21 @@ class BillingDaoImplementation(BillingDaoService):
         except Exception as e:
             print("Error deleting bill:", e)
             return False
+
+    def find_bills_by_date(self, search_date) -> List[Billing]:
+        """Find bills by specific date"""
+        try:
+            self.cursor.execute(self.QUERY_FIND_BY_DATE, (search_date,))
+            rows = self.cursor.fetchall()
+            return [
+                Billing(
+                    bill_id=row[0],
+                    appointment_id=row[1],
+                    doctor_fee=row[2],
+                    bill_date=row[3]
+                )
+                for row in rows
+            ]
+        except Exception as e:
+            print("Error finding bills by date:", e)
+            return []

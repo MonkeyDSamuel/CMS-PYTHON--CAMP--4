@@ -10,7 +10,8 @@ class Appointment:
         doctor_id: str = None,
         appointment_date: date = None,
         reason: str = None,
-        token_no: int = None
+        token_no: int = None,
+        app_status: str = None
     ):
         self.__appointment_id = appointment_id
         self.__patient_id = patient_id
@@ -18,6 +19,7 @@ class Appointment:
         self.__appointment_date = appointment_date
         self.__reason = reason
         self.__token_no = token_no
+        self.__app_status = app_status
 
     # ---------------------------
     # Appointment ID
@@ -101,6 +103,19 @@ class Appointment:
         self.__token_no = token_no
 
     # ---------------------------
+    # App Status
+    # ---------------------------
+    @property
+    def app_status(self):
+        return self.__app_status
+
+    @app_status.setter
+    def app_status(self, status: str):
+        if status and not isinstance(status, str):
+            raise ValueError("Status must be a string")
+        self.__app_status = status
+
+    # ---------------------------
     # String representation
     # ---------------------------
     def __str__(self):
@@ -111,4 +126,5 @@ class Appointment:
         Appointment Date : {self.__appointment_date}
         Reason           : {self.__reason}
         Token Number     : {self.__token_no}
+        Status           : {self.__app_status}
         """

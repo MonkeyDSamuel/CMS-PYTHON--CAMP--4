@@ -31,3 +31,8 @@ class PatientDaoService(ABC):
     def disable_patient(self, patient_id: int) -> bool:
         """Disable (deactivate) a patient by ID"""
         pass
+
+    @abstractmethod
+    def find_by_name(self, name: str) -> List[Patient]:
+        """Find patients whose first or last name matches (case-insensitive, partial)."""
+        pass

@@ -110,3 +110,34 @@ class BillingManagementLib:
             self.insert_bill(appointment_id, doctor_fee)
         except Exception as e:
             print("Error creating bill:", e)
+
+    def search_bills_by_date(self):
+        """Search bills by date (defaults to today if left empty)"""
+        try:
+            from datetime import datetime, date
+            
+            date_input = input("Enter Date to search (dd/mm/yyyy) (press Enter for today): ").strip()
+            
+            if not date_input:
+                search_date = date.today()
+                print(f"Searching for bills on: {search_date.strftime('%d/%m/%Y')}")
+            else:
+                try:
+                    search_date = datetime.strptime(date_input, "%d/%m/%Y").date()
+                except ValueError:
+                    print("❌ Invalid date format. Please use dd/mm/yyyy format.")
+                    return
+            
+            bills = self.dao.find_bills_by_date(search_date)
+            
+            if not bills:
+                print(f"No bills found for {search_date.strftime('%d/%m/%Y')}")
+                return
+            
+            print(f"\n--- Bills on {search_date.strftime('%d/%m/%Y')} ---")
+            for bill in bills:
+                print(f"Bill ID: {bill.bill_id}, Appointment: {bill.appointment_id}, "
+                      f"Total: {bill.total_bill}, Date: {bill.bill_date}")
+                      
+        except Exception as e:
+            print("Error searching bills by date:", e)

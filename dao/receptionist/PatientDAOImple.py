@@ -36,12 +36,27 @@ class PatientDaoImplementation(PatientDaoService):
         SET first_name = %s, last_name = %s, DOB = %s, phone_no = %s,
             email_id = %s, address = %s, height = %s, weight = %s,
             gender = %s, blood_group = %s, marital_status = %s,
-            current_medications = %s, emergency_contact = %s, is_active = %s
+            current_medications = %s, emergency_contact = %s
         WHERE patient_id = %s
     """
     
     DISABLE_PATIENT = "UPDATE patient SET is_active = %s WHERE patient_id = %s"
-    
+    CANCEL_APPTS_BY_PATIENT = "UPDATE appointment SET app_status = %s WHERE Patient_id = %s"
+    DELETE_TOKENS_FOR_PATIENT = (
+        "DELETE t FROM app_token t "
+        "JOIN appointment a ON a.Doctor_id = t.doc_id "
+        "AND a.token_no = t.token "
+        "AND DATE(a.Appointment_date) = t.token_date "
+        "WHERE a.Patient_id = %s"
+    )
+
+    FIND_BY_NAME = (
+        "SELECT patient_id, first_name, last_name, dob AS DOB, phone_no, email_id, address, "
+        "height, weight, gender, blood_group, marital_status, current_medications, emergency_contact, is_active "
+        "FROM patient "
+        "WHERE is_active = 1 AND (LOWER(first_name) LIKE LOWER(%s) OR LOWER(last_name) LIKE LOWER(%s))"
+    )
+
     def __init__(self):
         self.conn = DBConnection().get_connection()
 
@@ -203,7 +218,6 @@ class PatientDaoImplementation(PatientDaoService):
                 patient.marital_status,
                 patient.current_medications,
                 patient.emergency_contact,
-                self._to_active_tinyint(patient.is_active),
                 patient_id
             ))
             self.conn.commit()
@@ -222,18 +236,59 @@ class PatientDaoImplementation(PatientDaoService):
         cursor = None
         try:
             cursor = self.conn.cursor()
+            # Begin transactional update: deactivate patient, cancel appointments, free tokens
             cursor.execute(self.DISABLE_PATIENT, (
                 self._to_active_tinyint(patient.is_active),
                 patient_id
             ))
+            # Only proceed to cancel if deactivation intended (N -> 0)
+            if self._to_active_tinyint(patient.is_active) == 0:
+                # Set all appointments for this patient to CANCELLED
+                cursor.execute(self.CANCEL_APPTS_BY_PATIENT, ("CANCELLED", patient_id))
+                # Free tokens reserved by those appointments
+                cursor.execute(self.DELETE_TOKENS_FOR_PATIENT, (patient_id,))
             self.conn.commit()
-            return cursor.rowcount == 1
+            return True
         except Exception as e:
-            print("Error disabling patient: ", e)
+            print("Error disabling patient:", e)
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
             return False
+
+    def find_by_name(self, name: str) -> List[Patient]:
+        patients = []
+        cursor = None
+        try:
+            like_param = f"%{name.strip()}%"
+            cursor = self.conn.cursor(DictCursor)
+            cursor.execute(self.FIND_BY_NAME, (like_param, like_param))
+            rows = cursor.fetchall()
+            for row in rows:
+                patients.append(Patient(
+                    patient_id=row["patient_id"],
+                    first_name=row["first_name"],
+                    last_name=row["last_name"],
+                    DOB=row["DOB"],
+                    phone_no=row["phone_no"],
+                    email=row["email_id"],
+                    address=row["address"],
+                    height=row["height"],
+                    weight=row["weight"],
+                    gender=row["gender"],
+                    blood_group=row["blood_group"],
+                    marital_status=row["marital_status"],
+                    current_medications=row["current_medications"],
+                    emergency_contact=row["emergency_contact"],
+                    is_active=('Y' if row["is_active"] == 1 else 'N')
+                ))
+        except Exception as e:
+            print("Error searching patients by name:", e)
         finally:
             try:
                 if cursor is not None:
                     cursor.close()
             except Exception:
                 pass
+        return patients
