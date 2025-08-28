@@ -1,3 +1,5 @@
+from datetime import datetime,date
+
 class LabTestResult:
     def __init__(self, result_id: int, lab_test_id: int, lab_prescription_id: int, status: str, date: datetime):
         self.__result_id = result_id

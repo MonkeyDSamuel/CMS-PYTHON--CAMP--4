@@ -1,5 +1,7 @@
+from datetime import datetime,date
+
 class LabBilling:
-    def __init__(self, bill_id: int, lab_prescription_id: int, charge: float, billing_date: date_time):
+    def __init__(self, bill_id: int, lab_prescription_id: int, charge: float, billing_date: datetime):
         self.__bill_id = bill_id
         self.__lab_prescription_id = lab_prescription_id
         self.__charge = charge

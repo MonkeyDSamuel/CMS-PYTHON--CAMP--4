@@ -22,3 +22,12 @@ class TestCategory:
     def __repr__(self):
         return f"TestCategory(ID={self.__category_id}, Name='{self.__category_name}')"
 
+# Updated to align with SQL 'test_category' table
+class LabCategory:
+    def __init__(self, category_id: str, category_name: str):
+        self.category_id = category_id
+        self.category_name = category_name
+
+    def __repr__(self):
+        return f"LabCategory(ID={self.category_id}, Name='{self.category_name}')"
+

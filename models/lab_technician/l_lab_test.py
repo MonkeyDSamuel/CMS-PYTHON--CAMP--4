@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 class LabTest:
     def __init__(self, lab_test_id: int, lab_test_name: str, category_id: int,
                  rate: float, created_on: datetime, min_value: float, max_value: float, is_active: bool = True):
@@ -31,5 +34,5 @@ class LabTest:
     def set_is_active(self, status: bool): self.__is_active = status
 
     def __repr__(self):
-        return f"LabTest(ID={self.__lab_test_id}, Name='{self.__lab_test_name}', Active={self.__is_active})"
+        return f"LabTest(ID={self.__lab_test_id}, Name='{self.__lab_test_name}', Rate={self.__rate}, Active={self.__is_active})"
 
